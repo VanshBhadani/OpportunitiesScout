@@ -1,0 +1,281 @@
+[Skip to main content](https://docs.z.ai/api-reference/introduction#content-area)
+[Overview - Z.AI DEVELOPER DOCUMENT home page](https://z.ai/model-api)
+- [API Keys](https://z.ai/manage-apikey/apikey-list)
+- [Payment Method](https://z.ai/manage-apikey/billing)
+[API Keys](https://z.ai/manage-apikey/apikey-list)
+[Payment Method](https://z.ai/manage-apikey/billing)
+[Guides](https://docs.z.ai/guides/overview/quick-start)
+[API Reference](https://docs.z.ai/api-reference/introduction)
+[Scenario Example](https://docs.z.ai/scenario-example/develop-tools/claude)
+[Coding Plan](https://docs.z.ai/devpack/overview)
+[Released Notes](https://docs.z.ai/release-notes/new-released)
+[Terms and Policy](https://docs.z.ai/legal-agreement/privacy-policy)
+[Help Center](https://docs.z.ai/help/faq)
+
+##### Using the APIs
+- [Introduction](https://docs.z.ai/api-reference/introduction)
+- [Errors](https://docs.z.ai/api-reference/api-code)
+- [Rate Limits](https://z.ai/manage-apikey/rate-limits)
+[Introduction](https://docs.z.ai/api-reference/introduction)
+[Errors](https://docs.z.ai/api-reference/api-code)
+[Rate Limits](https://z.ai/manage-apikey/rate-limits)
+
+##### Model API
+- [POSTChat Completion](https://docs.z.ai/api-reference/llm/chat-completion)
+[POSTChat Completion](https://docs.z.ai/api-reference/llm/chat-completion)
+
+##### Image API
+- [POSTGenerate Image](https://docs.z.ai/api-reference/image/generate-image)
+- [POSTGenerate Image(Async)](https://docs.z.ai/api-reference/image/generate-image-async)
+- [GETRetrieve Result](https://docs.z.ai/api-reference/image/get-image-status)
+[POSTGenerate Image](https://docs.z.ai/api-reference/image/generate-image)
+[POSTGenerate Image(Async)](https://docs.z.ai/api-reference/image/generate-image-async)
+[GETRetrieve Result](https://docs.z.ai/api-reference/image/get-image-status)
+
+##### Video API
+- [POSTGenerate Video(Async)](https://docs.z.ai/api-reference/video/generate-video)
+- [GETRetrieve Result](https://docs.z.ai/api-reference/video/get-video-status)
+[POSTGenerate Video(Async)](https://docs.z.ai/api-reference/video/generate-video)
+[GETRetrieve Result](https://docs.z.ai/api-reference/video/get-video-status)
+
+##### Audio API
+- [POSTAudio Transcriptions](https://docs.z.ai/api-reference/audio/audio-transcriptions)
+[POSTAudio Transcriptions](https://docs.z.ai/api-reference/audio/audio-transcriptions)
+
+##### Tool API
+- [POSTTokenizer](https://docs.z.ai/api-reference/tools/tokenizer)
+- [POSTLayout Parsing](https://docs.z.ai/api-reference/tools/layout-parsing)
+- [POSTWeb Search](https://docs.z.ai/api-reference/tools/web-search)
+- [POSTWeb Reader](https://docs.z.ai/api-reference/tools/web-reader)
+[POSTTokenizer](https://docs.z.ai/api-reference/tools/tokenizer)
+[POSTLayout Parsing](https://docs.z.ai/api-reference/tools/layout-parsing)
+[POSTWeb Search](https://docs.z.ai/api-reference/tools/web-search)
+[POSTWeb Reader](https://docs.z.ai/api-reference/tools/web-reader)
+
+##### Agent API
+- [POSTAgent Chat](https://docs.z.ai/api-reference/agents/agent)
+- [POSTFile Upload](https://docs.z.ai/api-reference/agents/file-upload)
+- [POSTRetrieve Result](https://docs.z.ai/api-reference/agents/get-async-result)
+- [POSTConversation History](https://docs.z.ai/api-reference/agents/agent-conversation)
+[POSTAgent Chat](https://docs.z.ai/api-reference/agents/agent)
+[POSTFile Upload](https://docs.z.ai/api-reference/agents/file-upload)
+[POSTRetrieve Result](https://docs.z.ai/api-reference/agents/get-async-result)
+[POSTConversation History](https://docs.z.ai/api-reference/agents/agent-conversation)
+- [API Endpoint](https://docs.z.ai/api-reference/introduction#api-endpoint)
+- [Authentication](https://docs.z.ai/api-reference/introduction#authentication)
+- [Playground](https://docs.z.ai/api-reference/introduction#playground)
+- [Call Examples](https://docs.z.ai/api-reference/introduction#call-examples)
+[API Endpoint](https://docs.z.ai/api-reference/introduction#api-endpoint)
+[Authentication](https://docs.z.ai/api-reference/introduction#authentication)
+[Playground](https://docs.z.ai/api-reference/introduction#playground)
+[Call Examples](https://docs.z.ai/api-reference/introduction#call-examples)
+
+# Introduction
+
+[SDKs](https://docs.z.ai/guides/develop/python/introduction)
+
+## [​](https://docs.z.ai/api-reference/introduction#api-endpoint)API Endpoint
+[​](https://docs.z.ai/api-reference/introduction#api-endpoint)
+
+```
+https://api.z.ai/api/paas/v4
+```
+
+
+```
+https://api.z.ai/api/paas/v4
+```
+
+[GLM Coding Plan](https://docs.z.ai/devpack/overview)
+[https://api.z.ai/api/coding/paas/v4](https://api.z.ai/api/coding/paas/v4)
+[https://api.z.ai/api/paas/v4](https://api.z.ai/api/paas/v4)
+
+## [​](https://docs.z.ai/api-reference/introduction#authentication)Authentication
+[​](https://docs.z.ai/api-reference/introduction#authentication)
+[API Keys Page](https://z.ai/manage-apikey/apikey-list)
+
+```
+Authorization: Bearer ZAI_API_KEY
+```
+
+
+```
+Authorization: Bearer ZAI_API_KEY
+```
+
+## [​](https://docs.z.ai/api-reference/introduction#playground)Playground
+[​](https://docs.z.ai/api-reference/introduction#playground)
+- On the API details page, there are many interactive options, such as switching input types, switching tabs, and adding new content.
+- You can click Add an item or Add new property to add more properties the API need.
+- Note that when switching the tabs, the previous properties value you need re-input or re-switch.
+
+## [​](https://docs.z.ai/api-reference/introduction#call-examples)Call Examples
+
+[​](https://docs.z.ai/api-reference/introduction#call-examples)
+-  cURL
+-  Official Python SDK
+-  Official Java SDK
+-  OpenAI Python SDK
+-  OpenAI NodeJs SDK
+-  OpenAI Java SDK
+
+```
+curl -X POST "https://api.z.ai/api/paas/v4/chat/completions" \ -H "Content-Type: application/json" \ -H "Accept-Language: en-US,en" \ -H "Authorization: Bearer YOUR_API_KEY" \ -d '{ "model": "glm-5.1", "messages": [ { "role": "system", "content": "You are a helpful AI assistant." }, { "role": "user", "content": "Hello, please introduce yourself." } ], "temperature": 1.0, "stream": true }'
+```
+
+
+```
+curl -X POST "https://api.z.ai/api/paas/v4/chat/completions" \ -H "Content-Type: application/json" \ -H "Accept-Language: en-US,en" \ -H "Authorization: Bearer YOUR_API_KEY" \ -d '{ "model": "glm-5.1", "messages": [ { "role": "system", "content": "You are a helpful AI assistant." }, { "role": "user", "content": "Hello, please introduce yourself." } ], "temperature": 1.0, "stream": true }'
+```
+
+
+```
+# Install latest version pip install zai-sdk # Or specify version pip install zai-sdk==0.2.2
+```
+
+
+```
+# Install latest version pip install zai-sdk # Or specify version pip install zai-sdk==0.2.2
+```
+
+
+```
+import zai print(zai.__version__)
+```
+
+
+```
+import zai print(zai.__version__)
+```
+
+
+```
+from zai import ZaiClient # Initialize client client = ZaiClient(api_key="YOUR_API_KEY") # Create chat completion request response = client.chat.completions.create( model="glm-5.1", messages=[ { "role": "system", "content": "You are a helpful AI assistant." }, { "role": "user", "content": "Hello, please introduce yourself." } ] ) # Get response print(response.choices[0].message.content)
+```
+
+
+```
+from zai import ZaiClient # Initialize client client = ZaiClient(api_key="YOUR_API_KEY") # Create chat completion request response = client.chat.completions.create( model="glm-5.1", messages=[ { "role": "system", "content": "You are a helpful AI assistant." }, { "role": "user", "content": "Hello, please introduce yourself." } ] ) # Get response print(response.choices[0].message.content)
+```
+
+
+```
+<dependency> <groupId>ai.z.openapi</groupId> <artifactId>zai-sdk</artifactId> <version>0.3.3</version> </dependency>
+```
+
+
+```
+<dependency> <groupId>ai.z.openapi</groupId> <artifactId>zai-sdk</artifactId> <version>0.3.3</version> </dependency>
+```
+
+
+```
+implementation 'ai.z.openapi:zai-sdk:0.3.3'
+```
+
+
+```
+implementation 'ai.z.openapi:zai-sdk:0.3.3'
+```
+
+
+```
+import ai.z.openapi.ZaiClient; import ai.z.openapi.service.model.*; import java.util.Arrays; public class QuickStart { public static void main(String[] args) { // Initialize client ZaiClient client = ZaiClient.builder().ofZAI() .apiKey("YOUR_API_KEY") .build(); // Create chat completion request ChatCompletionCreateParams request = ChatCompletionCreateParams.builder() .model("glm-5.1") .messages(Arrays.asList( ChatMessage.builder() .role(ChatMessageRole.USER.value()) .content("Hello, who are you?") .build() )) .stream(false) .build(); // Send request ChatCompletionResponse response = client.chat().createChatCompletion(request); // Get response System.out.println(response.getData().getChoices().get(0).getMessage().getContent()); } }
+```
+
+
+```
+import ai.z.openapi.ZaiClient; import ai.z.openapi.service.model.*; import java.util.Arrays; public class QuickStart { public static void main(String[] args) { // Initialize client ZaiClient client = ZaiClient.builder().ofZAI() .apiKey("YOUR_API_KEY") .build(); // Create chat completion request ChatCompletionCreateParams request = ChatCompletionCreateParams.builder() .model("glm-5.1") .messages(Arrays.asList( ChatMessage.builder() .role(ChatMessageRole.USER.value()) .content("Hello, who are you?") .build() )) .stream(false) .build(); // Send request ChatCompletionResponse response = client.chat().createChatCompletion(request); // Get response System.out.println(response.getData().getChoices().get(0).getMessage().getContent()); } }
+```
+
+
+```
+# Install or upgrade to latest version pip install --upgrade 'openai>=1.0'
+```
+
+
+```
+# Install or upgrade to latest version pip install --upgrade 'openai>=1.0'
+```
+
+
+```
+python -c "import openai; print(openai.__version__)"
+```
+
+
+```
+python -c "import openai; print(openai.__version__)"
+```
+
+## [​](https://docs.z.ai/api-reference/introduction#call-examples)Call Examples
+
+```
+from openai import OpenAI client = OpenAI( api_key="your-Z.AI-api-key", base_url="https://api.z.ai/api/paas/v4/" ) completion = client.chat.completions.create( model="glm-5.1", messages=[ {"role": "system", "content": "You are a smart and creative novelist"}, {"role": "user", "content": "Please write a short fairy tale story as a fairy tale master"} ] ) print(completion.choices[0].message.content)
+```
+
+
+```
+from openai import OpenAI client = OpenAI( api_key="your-Z.AI-api-key", base_url="https://api.z.ai/api/paas/v4/" ) completion = client.chat.completions.create( model="glm-5.1", messages=[ {"role": "system", "content": "You are a smart and creative novelist"}, {"role": "user", "content": "Please write a short fairy tale story as a fairy tale master"} ] ) print(completion.choices[0].message.content)
+```
+
+
+```
+# Install or upgrade to latest version npm install openai # Or using yarn yarn add openai
+```
+
+
+```
+# Install or upgrade to latest version npm install openai # Or using yarn yarn add openai
+```
+
+
+```
+import OpenAI from "openai"; const client = new OpenAI({ apiKey: "your-Z.AI-api-key", baseURL: "https://api.z.ai/api/paas/v4/" }); async function main() { const completion = await client.chat.completions.create({ model: "glm-5.1", messages: [ { role: "system", content: "You are a helpful AI assistant." }, { role: "user", content: "Hello, please introduce yourself." } ] }); console.log(completion.choices[0].message.content); } main();
+```
+
+
+```
+import OpenAI from "openai"; const client = new OpenAI({ apiKey: "your-Z.AI-api-key", baseURL: "https://api.z.ai/api/paas/v4/" }); async function main() { const completion = await client.chat.completions.create({ model: "glm-5.1", messages: [ { role: "system", content: "You are a helpful AI assistant." }, { role: "user", content: "Hello, please introduce yourself." } ] }); console.log(completion.choices[0].message.content); } main();
+```
+
+
+```
+<dependency> <groupId>com.openai</groupId> <artifactId>openai-java</artifactId> <version>2.20.1</version> </dependency>
+```
+
+
+```
+<dependency> <groupId>com.openai</groupId> <artifactId>openai-java</artifactId> <version>2.20.1</version> </dependency>
+```
+
+
+```
+implementation 'com.openai:openai-java:2.20.1'
+```
+
+
+```
+implementation 'com.openai:openai-java:2.20.1'
+```
+
+
+```
+import com.openai.client.OpenAIClient; import com.openai.client.okhttp.OpenAIOkHttpClient; import com.openai.models.chat.completions.ChatCompletion; import com.openai.models.chat.completions.ChatCompletionCreateParams; public class QuickStart { public static void main(String[] args) { // Initialize client OpenAIClient client = OpenAIOkHttpClient.builder() .apiKey("your-Z.AI-api-key") .baseUrl("https://api.z.ai/api/paas/v4/") .build(); // Create chat completion request ChatCompletionCreateParams params = ChatCompletionCreateParams.builder() .addSystemMessage("You are a helpful AI assistant.") .addUserMessage("Hello, please introduce yourself.") .model("glm-5.1") .build(); // Send request and get response ChatCompletion chatCompletion = client.chat().completions().create(params); Object response = chatCompletion.choices().get(0).message().content(); System.out.println(response); } }
+```
+
+
+```
+import com.openai.client.OpenAIClient; import com.openai.client.okhttp.OpenAIOkHttpClient; import com.openai.models.chat.completions.ChatCompletion; import com.openai.models.chat.completions.ChatCompletionCreateParams; public class QuickStart { public static void main(String[] args) { // Initialize client OpenAIClient client = OpenAIOkHttpClient.builder() .apiKey("your-Z.AI-api-key") .baseUrl("https://api.z.ai/api/paas/v4/") .build(); // Create chat completion request ChatCompletionCreateParams params = ChatCompletionCreateParams.builder() .addSystemMessage("You are a helpful AI assistant.") .addUserMessage("Hello, please introduce yourself.") .model("glm-5.1") .build(); // Send request and get response ChatCompletion chatCompletion = client.chat().completions().create(params); Object response = chatCompletion.choices().get(0).message().content(); System.out.println(response); } }
+```
+
+Was this page helpful?
+[Errors](https://docs.z.ai/api-reference/api-code)
+[x](https://x.com/Zai_org)
+[github](https://github.com/zai-org)
+[discord](https://discord.gg/QR7SARHRxK)
+[linkedin](https://www.linkedin.com/company/zdotai)
+
+## [​](https://docs.z.ai/api-reference/introduction#call-examples)Call Examples
+
+[Powered byThis documentation is built and hosted on Mintlify, a developer documentation platform](https://www.mintlify.com?utm_campaign=poweredBy&utm_medium=referral&utm_source=zhipu-32152247)
