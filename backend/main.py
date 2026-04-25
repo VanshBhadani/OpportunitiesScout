@@ -571,28 +571,32 @@ async def _background_pipeline(db_session_factory, run_id_holder: list):
         db.close()
 
 
+class RunConfig(BaseModel):
+    max_process: Optional[int] = 50  # None = process every unscored opportunity
+
+
 @app.post("/api/agent/run", tags=["Agent"])
-async def trigger_agent(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+async def trigger_agent(
+    background_tasks: BackgroundTasks,
+    config: RunConfig = RunConfig(),
+    db: Session = Depends(get_db),
+):
     """Trigger the full scrape → check → rank pipeline in the background."""
-    # Create the RunLog immediately so the client has an ID to poll right away
     run_log = RunLog(started_at=datetime.utcnow(), status="running")
     db.add(run_log)
     db.commit()
     db.refresh(run_log)
     run_id = run_log.id
 
-    async def _run(rid: int):
-        """Background task: runs pipeline updating the SAME RunLog (rid)."""
+    async def _run(rid: int, max_process: Optional[int]):
         from backend.db.database import SessionLocal
         db2 = SessionLocal()
         try:
-            # Pass existing run_id so run_pipeline reuses this log entry
-            await run_pipeline(db2, existing_run_id=rid)
+            await run_pipeline(db2, existing_run_id=rid, max_process=max_process)
         except Exception as exc:
             logger.error("Background pipeline error: %s", exc)
-            # Mark the RunLog as failed so polling stops
             try:
-                log_row = db2.query(RunLog).get(rid)
+                log_row = db2.query(RunLog).filter(RunLog.id == rid).first()
                 if log_row and log_row.status == "running":
                     log_row.status = "failed"
                     log_row.finished_at = datetime.utcnow()
@@ -603,8 +607,9 @@ async def trigger_agent(background_tasks: BackgroundTasks, db: Session = Depends
         finally:
             db2.close()
 
-    background_tasks.add_task(_run, run_id)
-    return {"run_log_id": run_id, "status": "started"}
+    background_tasks.add_task(_run, run_id, config.max_process)
+    return {"run_log_id": run_id, "status": "started", "max_process": config.max_process}
+
 
 
 @app.get("/api/agent/status/{run_id}", response_model=RunLogOut, tags=["Agent"])

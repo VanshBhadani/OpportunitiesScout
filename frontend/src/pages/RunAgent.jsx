@@ -8,7 +8,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { runAgent, getAgentStatus, getAgentLogs, sendDigest, getAiProvider, setAiProvider, getAgentProgress } from '../api'
 import StatusBadge from '../components/StatusBadge'
-import { Zap, RefreshCw, Mail, Clock, CheckCircle, XCircle, Loader2, Search, Cpu, Terminal } from 'lucide-react'
+import { Zap, RefreshCw, Mail, Clock, CheckCircle, XCircle, Loader2, Search, Cpu, Terminal, SlidersHorizontal, Infinity } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 // Backend stores datetimes as naive UTC (no 'Z').  Without the suffix
@@ -76,6 +76,9 @@ export default function RunAgent() {
   const [provider, setProvider] = useState('nvidia')
   const [switchingProvider, setSwitchingProvider] = useState(false)
   const [progressLogs, setProgressLogs] = useState([])
+  // ── Pre-run config ─────────────────────────────────────────────
+  const [maxProcess, setMaxProcess] = useState(50)
+  const [processAll, setProcessAll] = useState(false)
   const pollRef = useRef(null)
   const progressPollRef = useRef(null)
   const progressEndRef = useRef(null)
@@ -175,8 +178,9 @@ export default function RunAgent() {
   async function handleRun() {
     setRunning(true)
     setProgressLogs([])
+    const config = { max_process: processAll ? null : maxProcess }
     try {
-      const data = await runAgent()
+      const data = await runAgent(config)
       const stub = {
         id: data.run_log_id,
         status: 'running',
@@ -186,7 +190,8 @@ export default function RunAgent() {
         opportunities_eligible: 0,
       }
       setCurrentRun(stub)
-      toast('Agent started! Live log updating below.', { icon: '⚡' })
+      const batchCount = processAll ? '?' : Math.ceil(maxProcess / 10)
+      toast(`Agent started! Will check ${processAll ? 'all' : maxProcess} opps in ${batchCount} sub-batches.`, { icon: '⚡' })
     } catch {
       toast.error('Failed to start agent — is the backend running?')
     } finally {
@@ -294,6 +299,71 @@ export default function RunAgent() {
           </div>
         </div>
 
+        {/* Pre-run config */}
+        <div className="mt-4 pt-4 border-t border-white/5">
+          <div className="flex items-center gap-2 mb-3">
+            <SlidersHorizontal size={13} className="text-slate-500" />
+            <span className="text-xs text-slate-500 font-medium">Processing Config</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Max opportunities input */}
+            <div className={`p-3 rounded-xl border transition-all ${
+              processAll ? 'border-white/5 bg-white/2 opacity-50' : 'border-white/10 bg-white/5'
+            }`}>
+              <div className="text-xs text-slate-400 mb-1.5 font-medium">Opportunities to check</div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="max-process-input"
+                  type="number"
+                  min={10}
+                  max={500}
+                  step={10}
+                  value={maxProcess}
+                  disabled={processAll || isRunning}
+                  onChange={e => setMaxProcess(Math.max(10, parseInt(e.target.value) || 10))}
+                  className="w-20 bg-black/30 border border-white/10 rounded-lg px-2 py-1 text-sm text-slate-100
+                             focus:outline-none focus:border-brand-500 disabled:opacity-40 text-center"
+                />
+                <span className="text-xs text-slate-500">
+                  → {Math.ceil(maxProcess / 10)} sub-batch{Math.ceil(maxProcess / 10) !== 1 ? 'es' : ''} of 10
+                </span>
+              </div>
+            </div>
+
+            {/* Process All toggle */}
+            <div
+              onClick={() => !isRunning && setProcessAll(p => !p)}
+              className={`p-3 rounded-xl border cursor-pointer transition-all select-none ${
+                processAll
+                  ? 'border-brand-500/50 bg-brand-500/10'
+                  : 'border-white/10 bg-white/5 hover:bg-white/8'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                  processAll ? 'border-brand-500 bg-brand-500' : 'border-white/30'
+                }`}>
+                  {processAll && <CheckCircle size={10} className="text-white" />}
+                </div>
+                <div>
+                  <div className="text-xs font-medium text-slate-200 flex items-center gap-1">
+                    <Infinity size={11} className="text-brand-400" /> Process All
+                  </div>
+                  <div className="text-xs text-slate-500">All unscored opps, sub-batches of 10</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Summary line */}
+          <div className="mt-2 text-xs text-slate-600">
+            {processAll
+              ? '⚡ Will check every unscored opportunity found (may take longer)'
+              : `⚡ Will check up to ${maxProcess} opportunities in ${Math.ceil(maxProcess / 10)} × 10 sub-batches`
+            }
+          </div>
+        </div>
+
         {/* AI Provider toggle */}
         <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-3">
           <Cpu size={14} className="text-slate-500" />
@@ -320,6 +390,8 @@ export default function RunAgent() {
             {provider === 'nvidia' ? 'minimaxai/minimax-m2.5' : 'glm-4.7-flash'}
           </span>
         </div>
+
+
 
         {/* Current run status — live updating */}
         {currentRun && (

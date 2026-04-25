@@ -51,7 +51,8 @@ export const tailorOpportunity = (id) =>
 
 // ── Agent ─────────────────────────────────────────────────────────
 
-export const runAgent = () => api.post('/agent/run').then(r => r.data)
+export const runAgent = (config = {}) => api.post('/agent/run', config).then(r => r.data)
+
 export const getAgentStatus = (runId) =>
   api.get(`/agent/status/${runId}`).then(r => r.data)
 export const getAgentLogs = () => api.get('/agent/logs').then(r => r.data)

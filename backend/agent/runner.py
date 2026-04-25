@@ -11,7 +11,9 @@
 
 import asyncio
 import logging
+import math
 from datetime import datetime, date
+from typing import Optional
 from sqlalchemy.orm import Session
 
 from backend.db.models import Profile, Opportunity, RunLog
@@ -26,9 +28,8 @@ from backend import progress as run_progress
 
 logger = logging.getLogger(__name__)
 
-# With batch mode, this is just ONE API call regardless of count.
-LLM_BATCH_LIMIT = 50
-SCRAPER_TIMEOUT = 240  # seconds — generous for Greenhouse/Lever network calls
+SUB_BATCH_SIZE = 10  # AI is called once per sub-batch of this size
+SCRAPER_TIMEOUT = 240
 
 
 async def _run_scrapers() -> list[dict]:
@@ -184,10 +185,11 @@ def _opp_to_dict(opp: Opportunity) -> dict:
     }
 
 
-async def run_pipeline(db: Session, existing_run_id: int | None = None) -> int:
+async def run_pipeline(db: Session, existing_run_id: int | None = None, max_process: Optional[int] = 50) -> int:
     """
     Execute the full scrape → check → rank pipeline.
-    If existing_run_id is provided, updates that RunLog instead of creating a new one.
+    max_process: how many unscored opportunities to check. None = all of them.
+    Eligibility is checked in sub-batches of SUB_BATCH_SIZE (10).
     Returns the RunLog.id for status polling.
     """
     if existing_run_id is not None:
@@ -228,36 +230,62 @@ async def run_pipeline(db: Session, existing_run_id: int | None = None) -> int:
         run_log.opportunities_found = len(opp_rows)
         db.commit()
 
-        # 5. Eligibility — BATCH MODE (single AI call for all opportunities)
-        unscored_existing = (
+        # 5. Eligibility — process in sub-batches of SUB_BATCH_SIZE
+        # Collect ALL unscored opps (new + previously stored)
+        all_unscored = (
             db.query(Opportunity)
             .filter(Opportunity.eligibility_score.is_(None))
-            .filter(~Opportunity.id.in_([o.id for o in opp_rows]))
-            .limit(LLM_BATCH_LIMIT)
+            .order_by(Opportunity.scraped_at.desc())
             .all()
         )
-        batch = (opp_rows + unscored_existing)[:LLM_BATCH_LIMIT]
-        run_progress.log(run_id, "eligibility", f"🤖 Checking eligibility for {len(batch)} opportunities via AI (1 API call)...")
-        logger.info("Sending %d opportunities to GLM in ONE batch call", len(batch))
+        # Apply user-chosen limit
+        to_check = all_unscored if max_process is None else all_unscored[:max_process]
+        total_to_check = len(to_check)
+        num_batches = max(1, math.ceil(total_to_check / SUB_BATCH_SIZE))
 
-        batch_input = [_opp_to_dict(opp_row) for opp_row in batch]
-        results = batch_check_eligibility(profile_dict, batch_input)
+        run_progress.log(
+            run_id, "eligibility",
+            f"🤖 Processing {total_to_check} opportunities in {num_batches} sub-batch{'es' if num_batches != 1 else ''} of {SUB_BATCH_SIZE}..."
+        )
+        logger.info("Eligibility: %d opps, %d sub-batches of %d", total_to_check, num_batches, SUB_BATCH_SIZE)
 
         eligible_count = 0
-        for opp_row, result in zip(batch, results):
-            opp_row.eligibility_score = result["score"]
-            opp_row.eligibility_reason = result["reason"]
-            opp_row.is_eligible = result["eligible"]
-            if result["eligible"]:
-                eligible_count += 1
+        for batch_num in range(num_batches):
+            start = batch_num * SUB_BATCH_SIZE
+            sub_batch = to_check[start : start + SUB_BATCH_SIZE]
 
-        db.commit()
-        run_progress.log(run_id, "eligibility", f"✅ {eligible_count} / {len(batch)} opportunities eligible")
+            run_progress.log(
+                run_id, "eligibility",
+                f"  ⚡ Sub-batch {batch_num + 1}/{num_batches}: checking {len(sub_batch)} opportunities..."
+            )
 
-        # 6. Rank
+            batch_input = [_opp_to_dict(opp_row) for opp_row in sub_batch]
+            results = batch_check_eligibility(profile_dict, batch_input)
+
+            for opp_row, result in zip(sub_batch, results):
+                opp_row.eligibility_score = result["score"]
+                opp_row.eligibility_reason = result["reason"]
+                opp_row.is_eligible = result["eligible"]
+                if result["eligible"]:
+                    eligible_count += 1
+
+            db.commit()
+            run_progress.log(
+                run_id, "eligibility",
+                f"  ✅ Sub-batch {batch_num + 1} done — {eligible_count} eligible so far"
+            )
+            # Update running count live
+            run_log_live = db.query(RunLog).filter(RunLog.id == run_id).first()
+            if run_log_live:
+                run_log_live.opportunities_eligible = eligible_count
+                db.commit()
+
+        run_progress.log(run_id, "eligibility", f"✅ {eligible_count} / {total_to_check} total eligible")
+
+        # 6. Rank all scored opps
         run_progress.log(run_id, "ranking", "📊 Ranking opportunities by fit score...")
         opp_dicts = []
-        for opp_row in batch:
+        for opp_row in to_check:
             d = _opp_to_dict(opp_row)
             d["eligibility_score"] = opp_row.eligibility_score
             d["_id"] = opp_row.id
@@ -266,7 +294,7 @@ async def run_pipeline(db: Session, existing_run_id: int | None = None) -> int:
         ranked = rank_opportunities(opp_dicts)
         for ranked_opp in ranked:
             opp_id = ranked_opp["_id"]
-            for opp_row in batch:
+            for opp_row in to_check:
                 if opp_row.id == opp_id:
                     opp_row.rank = ranked_opp.get("rank")
                     break
@@ -280,7 +308,7 @@ async def run_pipeline(db: Session, existing_run_id: int | None = None) -> int:
         run_log_obj.opportunities_eligible = eligible_count
         db.commit()
 
-        run_progress.log(run_id, "done", f"🏁 Done! Found {len(opp_rows)}, Eligible {eligible_count}")
+        run_progress.log(run_id, "done", f"🏁 Done! Scraped {len(opp_rows)} new, checked {total_to_check}, eligible {eligible_count}")
         run_progress.cleanup_old()
         logger.info("Pipeline complete. Found=%d Eligible=%d", len(opp_rows), eligible_count)
 
