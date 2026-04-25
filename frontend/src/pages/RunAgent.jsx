@@ -6,9 +6,9 @@
 // ────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { runAgent, getAgentStatus, getAgentLogs, sendDigest, getAiProvider, setAiProvider } from '../api'
+import { runAgent, getAgentStatus, getAgentLogs, sendDigest, getAiProvider, setAiProvider, getAgentProgress } from '../api'
 import StatusBadge from '../components/StatusBadge'
-import { Zap, RefreshCw, Mail, Clock, CheckCircle, XCircle, Loader2, Search, Cpu } from 'lucide-react'
+import { Zap, RefreshCw, Mail, Clock, CheckCircle, XCircle, Loader2, Search, Cpu, Terminal } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 // Backend stores datetimes as naive UTC (no 'Z').  Without the suffix
@@ -73,11 +73,14 @@ export default function RunAgent() {
   const [running, setRunning] = useState(false)
   const [sendingDigest, setSendingDigest] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
-  const [provider, setProvider] = useState('nvidia')   // 'nvidia' | 'glm'
+  const [provider, setProvider] = useState('nvidia')
   const [switchingProvider, setSwitchingProvider] = useState(false)
+  const [progressLogs, setProgressLogs] = useState([])
   const pollRef = useRef(null)
+  const progressPollRef = useRef(null)
+  const progressEndRef = useRef(null)
   const pollCountRef = useRef(0)
-  const MAX_POLLS = 360  // 12 minutes × 2s
+  const MAX_POLLS = 360
 
   const isRunning = currentRun?.status === 'running'
   const duration = useLiveDuration(currentRun?.started_at, currentRun?.finished_at)
@@ -128,6 +131,7 @@ export default function RunAgent() {
       pollCountRef.current += 1
       if (pollCountRef.current > MAX_POLLS) {
         clearInterval(pollRef.current)
+        clearInterval(progressPollRef.current)
         toast.error('Polling timed out. Refresh to check status.')
         loadLogs()
         return
@@ -137,6 +141,9 @@ export default function RunAgent() {
         setCurrentRun(data)
         if (data.status !== 'running') {
           clearInterval(pollRef.current)
+          clearInterval(progressPollRef.current)
+          // Fetch final progress
+          try { const p = await getAgentProgress(currentRun.id); setProgressLogs(p.logs) } catch {}
           loadLogs()
           if (data.status === 'completed')
             toast.success(`Run #${data.id} completed! Found ${data.opportunities_found} opportunities.`)
@@ -145,14 +152,29 @@ export default function RunAgent() {
         }
       } catch {
         clearInterval(pollRef.current)
+        clearInterval(progressPollRef.current)
       }
     }, 2000)
 
-    return () => clearInterval(pollRef.current)
-  }, [currentRun?.id, isRunning])   // only re-attach when run id changes or running state flips
+    // Also poll progress every 3 seconds
+    progressPollRef.current = setInterval(async () => {
+      try {
+        const p = await getAgentProgress(currentRun.id)
+        setProgressLogs(p.logs)
+        // Auto-scroll
+        progressEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      } catch { /* ignore */ }
+    }, 3000)
+
+    return () => {
+      clearInterval(pollRef.current)
+      clearInterval(progressPollRef.current)
+    }
+  }, [currentRun?.id, isRunning])
 
   async function handleRun() {
     setRunning(true)
+    setProgressLogs([])
     try {
       const data = await runAgent()
       const stub = {
@@ -164,7 +186,7 @@ export default function RunAgent() {
         opportunities_eligible: 0,
       }
       setCurrentRun(stub)
-      toast('Agent started! Stats update every 2 seconds.', { icon: '⚡' })
+      toast('Agent started! Live log updating below.', { icon: '⚡' })
     } catch {
       toast.error('Failed to start agent — is the backend running?')
     } finally {
@@ -338,6 +360,36 @@ export default function RunAgent() {
             {currentRun.error_message && (
               <div className="mt-3 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400">
                 {currentRun.error_message}
+              </div>
+            )}
+
+            {/* Live progress log */}
+            {progressLogs.length > 0 && (
+              <div className="mt-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Terminal size={12} className="text-slate-500" />
+                  <span className="text-xs text-slate-500 font-medium">Live Progress</span>
+                </div>
+                <div className="bg-black/40 rounded-xl p-3 max-h-48 overflow-y-auto font-mono space-y-1.5 border border-white/5">
+                  {progressLogs.map((entry, i) => (
+                    <div key={i} className={`text-xs flex gap-2 ${
+                      entry.stage === 'error' ? 'text-red-400' :
+                      entry.stage === 'done'  ? 'text-green-400' :
+                      'text-slate-300'
+                    }`}>
+                      <span className="text-slate-600 flex-shrink-0 tabular-nums">
+                        {entry.ts ? new Date(entry.ts + 'Z').toLocaleTimeString('en-IN', { timeStyle: 'short' }) : ''}
+                      </span>
+                      <span>{entry.message}</span>
+                    </div>
+                  ))}
+                  {isRunning && (
+                    <div className="text-xs text-brand-400 flex items-center gap-1">
+                      <Loader2 size={9} className="animate-spin" /> running...
+                    </div>
+                  )}
+                  <div ref={progressEndRef} />
+                </div>
               </div>
             )}
           </div>

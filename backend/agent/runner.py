@@ -22,6 +22,7 @@ from backend.scrapers.greenhouse import GreenhouseScraper
 from backend.scrapers.lever import LeverScraper
 from backend.agent.eligibility import batch_check_eligibility
 from backend.agent.ranker import rank_opportunities
+from backend import progress as run_progress
 
 logger = logging.getLogger(__name__)
 
@@ -204,43 +205,44 @@ async def run_pipeline(db: Session, existing_run_id: int | None = None) -> int:
         db.refresh(run_log)
     run_id = run_log.id
 
+    run_progress.init_run(run_id)
+
     try:
-        # 1. Load profile (use first profile if exists)
+        # 1. Load profile
+        run_progress.log(run_id, "init", "⚙️ Loading your profile...")
         profile_row = db.query(Profile).first()
         profile_dict = _profile_to_dict(profile_row) if profile_row else {}
 
         # 2. Scrape all platforms
+        run_progress.log(run_id, "scraping", "🔍 Scraping Internshala, Unstop, Devpost, Greenhouse, Lever... (takes ~2 min)")
         raw_opps = await _run_scrapers()
+        run_progress.log(run_id, "scraping", f"📥 Scraped {len(raw_opps)} total opportunities")
 
         # 3. Deduplicate
         new_opps = _deduplicate(raw_opps, db)
+        run_progress.log(run_id, "saving", f"💾 {len(new_opps)} new unique opportunities (skipped duplicates)")
         logger.info("New unique opportunities: %d", len(new_opps))
 
         # 4. Persist
         opp_rows = _persist_opportunities(new_opps, db)
-
         run_log.opportunities_found = len(opp_rows)
         db.commit()
 
-        # 5. Eligibility — BATCH MODE (single GLM call for all opportunities)
-        # Also back-fill any previously stored but unscored opportunities.
+        # 5. Eligibility — BATCH MODE (single AI call for all opportunities)
         unscored_existing = (
             db.query(Opportunity)
             .filter(Opportunity.eligibility_score.is_(None))
-            .filter(~Opportunity.id.in_([o.id for o in opp_rows]))  # exclude just-added
+            .filter(~Opportunity.id.in_([o.id for o in opp_rows]))
             .limit(LLM_BATCH_LIMIT)
             .all()
         )
         batch = (opp_rows + unscored_existing)[:LLM_BATCH_LIMIT]
+        run_progress.log(run_id, "eligibility", f"🤖 Checking eligibility for {len(batch)} opportunities via AI (1 API call)...")
         logger.info("Sending %d opportunities to GLM in ONE batch call", len(batch))
 
-        # Build input dicts for GLM
         batch_input = [_opp_to_dict(opp_row) for opp_row in batch]
-
-        # Single API call → returns list in same order as batch
         results = batch_check_eligibility(profile_dict, batch_input)
 
-        # Write results back to DB rows
         eligible_count = 0
         for opp_row, result in zip(batch, results):
             opp_row.eligibility_score = result["score"]
@@ -250,8 +252,10 @@ async def run_pipeline(db: Session, existing_run_id: int | None = None) -> int:
                 eligible_count += 1
 
         db.commit()
+        run_progress.log(run_id, "eligibility", f"✅ {eligible_count} / {len(batch)} opportunities eligible")
 
-        # 6. Rank — build dicts for ranker, then write ranks back
+        # 6. Rank
+        run_progress.log(run_id, "ranking", "📊 Ranking opportunities by fit score...")
         opp_dicts = []
         for opp_row in batch:
             d = _opp_to_dict(opp_row)
@@ -262,7 +266,6 @@ async def run_pipeline(db: Session, existing_run_id: int | None = None) -> int:
         ranked = rank_opportunities(opp_dicts)
         for ranked_opp in ranked:
             opp_id = ranked_opp["_id"]
-            # Find and update the row
             for opp_row in batch:
                 if opp_row.id == opp_id:
                     opp_row.rank = ranked_opp.get("rank")
@@ -270,18 +273,21 @@ async def run_pipeline(db: Session, existing_run_id: int | None = None) -> int:
         db.commit()
 
         # 7. Finalise run log
-        run_log_obj = db.query(RunLog).get(run_id)
+        run_log_obj = db.query(RunLog).filter(RunLog.id == run_id).first()
         run_log_obj.finished_at = datetime.utcnow()
         run_log_obj.status = "completed"
         run_log_obj.opportunities_found = len(opp_rows)
         run_log_obj.opportunities_eligible = eligible_count
         db.commit()
 
+        run_progress.log(run_id, "done", f"🏁 Done! Found {len(opp_rows)}, Eligible {eligible_count}")
+        run_progress.cleanup_old()
         logger.info("Pipeline complete. Found=%d Eligible=%d", len(opp_rows), eligible_count)
 
     except Exception as exc:
         logger.exception("Pipeline failed: %s", exc)
-        run_log_obj = db.query(RunLog).get(run_id)
+        run_progress.log(run_id, "error", f"❌ Error: {exc}")
+        run_log_obj = db.query(RunLog).filter(RunLog.id == run_id).first()
         if run_log_obj:
             run_log_obj.finished_at = datetime.utcnow()
             run_log_obj.status = "failed"

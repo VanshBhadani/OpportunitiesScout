@@ -31,6 +31,7 @@ from backend.email.digest import send_digest
 from backend.scheduler import start_scheduler, stop_scheduler
 from backend import glm_status
 from backend.ai_provider import get_provider, set_provider
+from backend import progress as run_progress
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -608,7 +609,9 @@ async def trigger_agent(background_tasks: BackgroundTasks, db: Session = Depends
 
 @app.get("/api/agent/status/{run_id}", response_model=RunLogOut, tags=["Agent"])
 def agent_status(run_id: int, db: Session = Depends(get_db)):
-    log = db.query(RunLog).get(run_id)
+    # Use filter().first() (not .get()) to bypass SQLAlchemy identity map
+    # and always get a fresh read from PostgreSQL
+    log = db.query(RunLog).filter(RunLog.id == run_id).first()
     if not log:
         raise HTTPException(status_code=404, detail="Run log not found")
     return log
@@ -617,6 +620,13 @@ def agent_status(run_id: int, db: Session = Depends(get_db)):
 @app.get("/api/agent/logs", response_model=list[RunLogOut], tags=["Agent"])
 def agent_logs(db: Session = Depends(get_db)):
     return db.query(RunLog).order_by(RunLog.started_at.desc()).limit(10).all()
+
+
+@app.get("/api/agent/progress/{run_id}", tags=["Agent"])
+def agent_progress(run_id: int):
+    """Return in-memory live progress log for a running pipeline."""
+    return {"run_id": run_id, "logs": run_progress.get_logs(run_id)}
+
 
 
 # ═══════════════════════════════════════════════════════════════════
