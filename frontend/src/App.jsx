@@ -2,12 +2,14 @@
 // App.jsx — Root component with React Router routes
 // ────────────────────────────────────────────────────────────────
 
-import { Routes, Route } from 'react-router-dom'
+import { useState, useCallback } from 'react'
+import { Routes, Route, useNavigate } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import Dashboard from './pages/Dashboard'
 import Profile from './pages/Profile'
 import RunAgent from './pages/RunAgent'
 import GlmIndicator from './components/GlmIndicator'
+import SplashScreen from './components/SplashScreen'
 
 // ── Subtle animated background ─────────────────────────────────────
 function BackgroundFX() {
@@ -95,14 +97,31 @@ function BackgroundFX() {
   )
 }
 
-export default function App() {
+function AppInner() {
+  const [showSplash, setShowSplash] = useState(true)
+  const navigate = useNavigate()
+
+  const handleSplashDone = useCallback(() => {
+    setShowSplash(false)
+    navigate('/', { replace: true })
+  }, [navigate])
+
   return (
     <div className="min-h-screen" style={{ background: 'var(--color-bg)', position: 'relative' }}>
       {/* Animated background — sits behind everything */}
       <BackgroundFX />
 
+      {/* Splash screen — shown on every hard reload */}
+      {showSplash && <SplashScreen onDone={handleSplashDone} />}
+
       {/* All real content sits above (z-index 1+) */}
-      <div style={{ position: 'relative', zIndex: 1 }}>
+      <div style={{
+        position: 'relative', zIndex: 1,
+        // keep content invisible until splash is done so it doesn't flash
+        opacity: showSplash ? 0 : 1,
+        transition: 'opacity 0.3s ease',
+        pointerEvents: showSplash ? 'none' : 'all',
+      }}>
         <Navbar />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Routes>
@@ -114,7 +133,12 @@ export default function App() {
       </div>
 
       {/* Global floating GLM status — visible on ALL pages */}
-      <GlmIndicator />
+      {!showSplash && <GlmIndicator />}
     </div>
   )
 }
+
+export default function App() {
+  return <AppInner />
+}
+
