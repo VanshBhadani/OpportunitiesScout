@@ -156,6 +156,9 @@ export default function RunAgent() {
       } catch {
         clearInterval(pollRef.current)
         clearInterval(progressPollRef.current)
+        // Fetch real status from DB so UI doesn't stay stuck on "Running"
+        loadLogs()
+        setCurrentRun(prev => prev ? { ...prev, status: 'failed', error_message: 'Lost connection to backend — check Render logs.' } : prev)
       }
     }, 2000)
 

@@ -231,23 +231,27 @@ async def run_pipeline(db: Session, existing_run_id: int | None = None, max_proc
         db.commit()
 
         # 5. Eligibility — process in sub-batches of SUB_BATCH_SIZE
-        # Collect ALL unscored opps (new + previously stored)
-        all_unscored = (
+        # Use opp_rows (just inserted) + any existing unscored from prior runs
+        unscored_existing = (
             db.query(Opportunity)
             .filter(Opportunity.eligibility_score.is_(None))
+            .filter(~Opportunity.id.in_([o.id for o in opp_rows] or [-1]))
             .order_by(Opportunity.scraped_at.desc())
             .all()
         )
+        all_candidates = opp_rows + unscored_existing  # newly inserted first
+
         # Apply user-chosen limit
-        to_check = all_unscored if max_process is None else all_unscored[:max_process]
+        to_check = all_candidates if max_process is None else all_candidates[:max_process]
         total_to_check = len(to_check)
-        num_batches = max(1, math.ceil(total_to_check / SUB_BATCH_SIZE))
+        num_batches = max(1, math.ceil(total_to_check / SUB_BATCH_SIZE)) if total_to_check > 0 else 0
 
         run_progress.log(
             run_id, "eligibility",
             f"🤖 Processing {total_to_check} opportunities in {num_batches} sub-batch{'es' if num_batches != 1 else ''} of {SUB_BATCH_SIZE}..."
         )
         logger.info("Eligibility: %d opps, %d sub-batches of %d", total_to_check, num_batches, SUB_BATCH_SIZE)
+
 
         eligible_count = 0
         for batch_num in range(num_batches):
