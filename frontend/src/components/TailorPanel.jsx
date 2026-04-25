@@ -15,7 +15,7 @@
 // ────────────────────────────────────────────────────────────────
 
 import { useEffect, useState } from 'react'
-import { tailorOpportunity } from '../api'
+import { tailorOpportunity, getAiProvider } from '../api'
 import {
   X, Sparkles, CheckCircle2, AlertCircle, FileText,
   Quote, Lightbulb, Loader2, Copy, Check, ExternalLink, RefreshCw
@@ -79,6 +79,14 @@ export default function TailorPanel({ opp, onClose }) {
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [aiProvider, setAiProvider] = useState('nvidia')
+
+  // Fetch active provider once on mount
+  useEffect(() => {
+    getAiProvider().then(d => setAiProvider(d.provider)).catch(() => {})
+  }, [])
+
+  const providerLabel = aiProvider === 'nvidia' ? 'NVIDIA NIM' : 'GLM-4.7-Flash'
 
   // Fetch analysis whenever a NEW opportunity is selected
   useEffect(() => {
@@ -177,7 +185,7 @@ export default function TailorPanel({ opp, onClose }) {
             {result && !loading && (
               <button
                 onClick={handleReanalyse}
-                title="Re-analyse with fresh GLM call"
+                title={`Re-analyse with fresh ${providerLabel} call`}
                 className="p-2 rounded-xl hover:bg-white/8 text-slate-500 hover:text-brand-400 transition-all"
               >
                 <RefreshCw size={15} />
@@ -199,7 +207,7 @@ export default function TailorPanel({ opp, onClose }) {
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm text-brand-400">
                 <Loader2 size={15} className="animate-spin" />
-                <span>Analysing with GLM‑4.7‑Flash…</span>
+                <span>Analysing with {providerLabel}…</span>
               </div>
               <Skeleton />
             </div>

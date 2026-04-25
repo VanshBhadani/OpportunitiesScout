@@ -11,7 +11,7 @@
 // ────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useRef } from 'react'
-import { getGlmStatus } from '../api'
+import { getGlmStatus, getAiProvider } from '../api'
 import { Sparkles } from 'lucide-react'
 
 const LABEL_ICONS = {
@@ -22,8 +22,18 @@ const LABEL_ICONS = {
 
 export default function GlmIndicator() {
   const [status, setStatus] = useState({ active: false, summary: null })
-  const [visible, setVisible] = useState(false)   // controls CSS show/hide
-  const timerRef = useRef(null)
+  const [visible, setVisible] = useState(false)
+  const [providerLabel, setProviderLabel] = useState('NVIDIA NIM')
+  const timerRef    = useRef(null)
+  const pollRef     = useRef(null)
+  const failsRef    = useRef(0)
+
+  // Fetch active provider label once on mount
+  useEffect(() => {
+    getAiProvider()
+      .then(d => setProviderLabel(d.provider === 'glm' ? 'GLM-4.7-Flash' : 'NVIDIA NIM'))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     let alive = true
@@ -33,30 +43,43 @@ export default function GlmIndicator() {
       try {
         const data = await getGlmStatus()
         if (!alive) return
-        setStatus(data)
 
+        // Success — reset failure counter & go back to 1s cadence
+        failsRef.current = 0
+
+        setStatus(data)
         if (data.active) {
           setVisible(true)
-          // Clear any pending hide timer
           clearTimeout(timerRef.current)
         } else {
-          // Keep visible for 1.5s after GLM finishes so the user sees "Done"
-          // We don't show "Done" text — just let it fade out naturally
           timerRef.current = setTimeout(() => setVisible(false), 1500)
         }
+
+        // Schedule next poll in 1 second
+        pollRef.current = setTimeout(poll, 1000)
       } catch {
-        // Backend unreachable — just hide the indicator
-        if (alive) setVisible(false)
+        if (!alive) return
+        // Backend unreachable — hide indicator
+        setVisible(false)
+        failsRef.current += 1
+
+        // Backoff: 1s → 2s → 5s → 10s (cap) so Vite terminal stays quiet
+        const delay = failsRef.current >= 3
+          ? 10_000        // backend is clearly down — check every 10s
+          : failsRef.current === 2
+            ? 5_000
+            : 2_000
+
+        pollRef.current = setTimeout(poll, delay)
       }
     }
 
-    // Poll immediately, then every 1 second
+    // Start immediately
     poll()
-    const id = setInterval(poll, 1000)
 
     return () => {
       alive = false
-      clearInterval(id)
+      clearTimeout(pollRef.current)
       clearTimeout(timerRef.current)
     }
   }, [])
@@ -99,10 +122,10 @@ export default function GlmIndicator() {
           <span className={`text-xs font-semibold leading-tight
             ${status.active ? 'text-brand-300' : 'text-slate-300'}`}
           >
-            {status.active ? `${icon} ${label}` : '✓ GLM done'}
+            {status.active ? `${icon} ${label}` : `✓ ${providerLabel} done`}
           </span>
           <span className="text-[10px] text-slate-500 leading-tight">
-            {status.active ? 'GLM-4.7-Flash · busy' : 'API free'}
+            {status.active ? `${providerLabel} · busy` : 'API free'}
           </span>
         </div>
 

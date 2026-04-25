@@ -45,11 +45,6 @@ export default function FilterBar({ filters, onChange }) {
           <option value="lever">Lever (18 cos.)</option>
         </optgroup>
 
-        <optgroup label="── Big Tech ──">
-          <option value="google">Google</option>
-          <option value="microsoft">Microsoft</option>
-          <option value="amazon">Amazon</option>
-        </optgroup>
       </select>
 
       {/* Eligible only */}

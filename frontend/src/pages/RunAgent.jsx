@@ -6,27 +6,34 @@
 // ────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { runAgent, getAgentStatus, getAgentLogs, sendDigest } from '../api'
+import { runAgent, getAgentStatus, getAgentLogs, sendDigest, getAiProvider, setAiProvider } from '../api'
 import StatusBadge from '../components/StatusBadge'
-import { Zap, RefreshCw, Mail, Clock, CheckCircle, XCircle, Loader2, Search } from 'lucide-react'
+import { Zap, RefreshCw, Mail, Clock, CheckCircle, XCircle, Loader2, Search, Cpu } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-// ── Live ticking clock ────────────────────────────────────────────
+// Backend stores datetimes as naive UTC (no 'Z').  Without the suffix
+// JavaScript treats them as LOCAL time (IST = UTC+5:30), making durations
+// appear to be ~330 minutes longer than reality.
+function parseUtc(s) {
+  if (!s) return null
+  // Append Z only if no timezone info is already present
+  return new Date(s.endsWith('Z') || s.includes('+') ? s : s + 'Z')
+}
 
 function useLiveDuration(startedAt, finishedAt) {
   const [elapsed, setElapsed] = useState('')
 
   useEffect(() => {
     if (!startedAt) { setElapsed('—'); return }
+    const start = parseUtc(startedAt)
     if (finishedAt) {
-      // static once finished
-      setElapsed(formatSecs(Math.round((new Date(finishedAt) - new Date(startedAt)) / 1000)))
+      const end = parseUtc(finishedAt)
+      setElapsed(formatSecs(Math.round((end - start) / 1000)))
       return
     }
-    // tick every second while running
     const tick = () => {
-      const secs = Math.round((Date.now() - new Date(startedAt)) / 1000)
-      setElapsed(formatSecs(secs))
+      const secs = Math.round((Date.now() - start) / 1000)
+      setElapsed(formatSecs(Math.max(0, secs)))
     }
     tick()
     const id = setInterval(tick, 1000)
@@ -66,6 +73,8 @@ export default function RunAgent() {
   const [running, setRunning] = useState(false)
   const [sendingDigest, setSendingDigest] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [provider, setProvider] = useState('nvidia')   // 'nvidia' | 'glm'
+  const [switchingProvider, setSwitchingProvider] = useState(false)
   const pollRef = useRef(null)
   const pollCountRef = useRef(0)
   const MAX_POLLS = 360  // 12 minutes × 2s
@@ -92,7 +101,7 @@ export default function RunAgent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // On mount — load history and auto-resume any in-progress run
+  // On mount — load history, auto-resume any in-progress run, fetch active provider
   useEffect(() => {
     async function init() {
       try {
@@ -101,6 +110,10 @@ export default function RunAgent() {
         if (data.length > 0 && data[0].status === 'running') {
           setCurrentRun(data[0])   // resume polling for the last run
         }
+      } catch { /* ignore */ }
+      try {
+        const p = await getAiProvider()
+        setProvider(p.provider)
       } catch { /* ignore */ }
     }
     init()
@@ -156,6 +169,20 @@ export default function RunAgent() {
       toast.error('Failed to start agent — is the backend running?')
     } finally {
       setRunning(false)
+    }
+  }
+
+  async function handleProviderSwitch(newProvider) {
+    if (newProvider === provider || switchingProvider) return
+    setSwitchingProvider(true)
+    try {
+      const data = await setAiProvider(newProvider)
+      setProvider(data.provider)
+      toast.success(`Switched to ${data.provider === 'nvidia' ? 'NVIDIA NIM' : 'ZhipuAI GLM'}`)
+    } catch {
+      toast.error('Failed to switch provider')
+    } finally {
+      setSwitchingProvider(false)
     }
   }
 
@@ -215,7 +242,11 @@ export default function RunAgent() {
           <div>
             <h2 className="font-semibold text-slate-100">Discovery Pipeline</h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Scrapes Internshala, Unstop &amp; Devpost · Checks eligibility via GLM-4-Flash · Ranks results
+              Scrapes Internshala, Unstop &amp; Devpost · Checks eligibility via{' '}
+              <span className={provider === 'nvidia' ? 'text-green-400' : 'text-purple-400'}>
+                {provider === 'nvidia' ? 'NVIDIA NIM (minimax-m2.5)' : 'ZhipuAI GLM-4-Flash'}
+              </span>
+              {' '}· Ranks results
             </p>
           </div>
           <div className="flex gap-2 flex-shrink-0">
@@ -239,6 +270,33 @@ export default function RunAgent() {
               Send Digest
             </button>
           </div>
+        </div>
+
+        {/* AI Provider toggle */}
+        <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-3">
+          <Cpu size={14} className="text-slate-500" />
+          <span className="text-xs text-slate-500 font-medium">AI Provider</span>
+          <div className="flex rounded-xl overflow-hidden border border-white/10 ml-1">
+            {[{ id: 'nvidia', label: 'NVIDIA NIM', color: 'text-green-400' },
+              { id: 'glm',    label: 'ZhipuAI GLM', color: 'text-purple-400' }].map(opt => (
+              <button
+                key={opt.id}
+                onClick={() => handleProviderSwitch(opt.id)}
+                disabled={switchingProvider}
+                className={`px-3 py-1.5 text-xs font-medium transition-all ${
+                  provider === opt.id
+                    ? `bg-white/10 ${opt.color}`
+                    : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
+                }`}
+              >
+                {switchingProvider && provider !== opt.id ? <Loader2 size={10} className="animate-spin inline mr-1" /> : null}
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <span className="text-xs text-slate-600 ml-auto">
+            {provider === 'nvidia' ? 'minimaxai/minimax-m2.5' : 'glm-4.7-flash'}
+          </span>
         </div>
 
         {/* Current run status — live updating */}
@@ -325,11 +383,11 @@ export default function RunAgent() {
                     <td className="py-2.5 text-slate-400">#{log.id}</td>
                     <td className="py-2.5"><StatusBadge type="status" value={log.status} /></td>
                     <td className="py-2.5 text-slate-400">
-                      {new Date(log.started_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
+                      {parseUtc(log.started_at)?.toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
                     </td>
                     <td className="py-2.5 text-slate-400">
                       {log.finished_at
-                        ? formatSecs(Math.round((new Date(log.finished_at) - new Date(log.started_at)) / 1000))
+                        ? formatSecs(Math.round((parseUtc(log.finished_at) - parseUtc(log.started_at)) / 1000))
                         : <span className="text-yellow-400 flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Running</span>
                       }
                     </td>

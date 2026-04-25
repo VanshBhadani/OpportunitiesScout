@@ -30,6 +30,7 @@ from backend.agent.runner import run_pipeline
 from backend.email.digest import send_digest
 from backend.scheduler import start_scheduler, stop_scheduler
 from backend import glm_status
+from backend.ai_provider import get_provider, set_provider
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -112,10 +113,31 @@ def _extract_json(raw: str) -> dict:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    # Clean up zombie runs left over from a previous backend crash / restart
+    _cleanup_zombie_runs()
     start_scheduler()
     logger.info("OpportunityScout API started")
     yield
     stop_scheduler()
+
+
+def _cleanup_zombie_runs():
+    """Mark any 'running' RunLog entries as failed — they can't still be
+    running because we just started a fresh process."""
+    from backend.db.database import SessionLocal
+    from backend.db.models import RunLog
+    db = SessionLocal()
+    try:
+        stuck = db.query(RunLog).filter(RunLog.status == "running").all()
+        if stuck:
+            for r in stuck:
+                r.status = "failed"
+                r.finished_at = datetime.utcnow()
+                r.error_message = "Killed: backend restarted while run was in progress"
+            db.commit()
+            logger.info("Cleaned up %d zombie run(s) from previous session", len(stuck))
+    finally:
+        db.close()
 
 
 # ── App ───────────────────────────────────────────────────────────
@@ -180,6 +202,30 @@ class OpportunityOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    from pydantic import field_validator
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def sanitize_tags(cls, v):
+        """Coerce tag items to strings — handles Amazon's dict tags like
+        {'label': 'team-sde-primary', ...} that were stored in old runs."""
+        if not isinstance(v, list):
+            return []
+        result = []
+        for item in v:
+            if isinstance(item, str):
+                result.append(item)
+            elif isinstance(item, dict):
+                # Extract 'label' or first string value found
+                label = item.get("label") or item.get("name") or item.get("title") or ""
+                if label:
+                    result.append(str(label))
+        return result
 
 
 class RunLogOut(BaseModel):
@@ -268,7 +314,17 @@ async def parse_resume(file: UploadFile = File(...)):
     # 3. Trim to ~4000 chars so we don't overflow the prompt
     resume_trimmed = resume_text[:4000]
 
-    # 4. Ask GLM to extract structured fields
+    # 4. Ask NVIDIA/GLM to extract structured fields
+    provider = get_provider()
+    if provider == "glm":
+        _api_key  = settings.zhipuai_api_key
+        _base_url = settings.zhipuai_base_url
+        _model    = settings.zhipuai_model
+    else:
+        _api_key  = settings.nvidia_api_key
+        _base_url = settings.nvidia_base_url
+        _model    = settings.nvidia_model
+
     prompt = (
         "Extract the following fields from this resume text. "
         "Return ONLY a raw JSON object — no markdown, no explanation:\n"
@@ -281,20 +337,18 @@ async def parse_resume(file: UploadFile = File(...)):
     )
 
     try:
-        client = OpenAI(
-            api_key=settings.zhipuai_api_key,
-            base_url=settings.zhipuai_base_url,
-        )
+        client = OpenAI(api_key=_api_key, base_url=_base_url)
         _call_id = glm_status.acquire("Resume parse")
         try:
             response = client.chat.completions.create(
-                model=settings.zhipuai_model,
+                model=_model,
                 messages=[
                     {"role": "system", "content": "You extract structured data from resumes. Always reply with ONLY a JSON object."},
                     {"role": "user",   "content": prompt},
                 ],
                 temperature=0.1,
-                max_tokens=2048,
+                top_p=0.95,
+                max_tokens=4096,
             )
         finally:
             glm_status.release(_call_id)
@@ -416,20 +470,28 @@ def tailor_opportunity(opp_id: int, db: Session = Depends(get_db)):
     )
 
     try:
-        client = OpenAI(
-            api_key=settings.zhipuai_api_key,
-            base_url=settings.zhipuai_base_url,
-        )
+        _provider = get_provider()
+        if _provider == "glm":
+            _api_key  = settings.zhipuai_api_key
+            _base_url = settings.zhipuai_base_url
+            _model    = settings.zhipuai_model
+        else:
+            _api_key  = settings.nvidia_api_key
+            _base_url = settings.nvidia_base_url
+            _model    = settings.nvidia_model
+
+        client = OpenAI(api_key=_api_key, base_url=_base_url)
         _call_id = glm_status.acquire("Job tailor")
         try:
             response = client.chat.completions.create(
-                model=settings.zhipuai_model,
+                model=_model,
                 messages=[
                     {"role": "system", "content": "You are a career coach. Reply with ONLY a JSON object, no markdown."},
                     {"role": "user",   "content": prompt},
                 ],
                 temperature=0.3,
-                max_tokens=2048,
+                top_p=0.95,
+                max_tokens=8192,
             )
         finally:
             glm_status.release(_call_id)
@@ -568,6 +630,28 @@ def trigger_digest(db: Session = Depends(get_db)):
         return {"message": "Digest sent successfully"}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Config routes
+# ═══════════════════════════════════════════════════════════════════
+
+@app.get("/api/config/provider", tags=["Config"])
+def get_active_provider():
+    """Return the currently active AI provider."""
+    return {"provider": get_provider()}
+
+
+@app.post("/api/config/provider", tags=["Config"])
+def set_active_provider(body: dict):
+    """Set the active AI provider ('nvidia' or 'glm')."""
+    provider = body.get("provider", "")
+    try:
+        new = set_provider(provider)
+        logger.info("AI provider switched to: %s", new)
+        return {"provider": new}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 # ── Dev entry point ────────────────────────────────────────────────

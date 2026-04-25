@@ -20,9 +20,6 @@ from backend.scrapers.unstop import UnstopScraper
 from backend.scrapers.devpost import DevpostScraper
 from backend.scrapers.greenhouse import GreenhouseScraper
 from backend.scrapers.lever import LeverScraper
-from backend.scrapers.google_careers import GoogleCareersScraper
-from backend.scrapers.microsoft_careers import MicrosoftCareersScraper
-from backend.scrapers.amazon_jobs import AmazonJobsScraper
 from backend.agent.eligibility import batch_check_eligibility
 from backend.agent.ranker import rank_opportunities
 
@@ -30,11 +27,14 @@ logger = logging.getLogger(__name__)
 
 # With batch mode, this is just ONE API call regardless of count.
 LLM_BATCH_LIMIT = 50
-SCRAPER_TIMEOUT = 180  # bumped: 8 scrapers now, some (google/amazon) are slower
+SCRAPER_TIMEOUT = 240  # seconds — generous for Greenhouse/Lever network calls
 
 
 async def _run_scrapers() -> list[dict]:
-    """Run all scrapers concurrently with a hard timeout to prevent hanging."""
+    """Run all scrapers concurrently.
+    Uses asyncio.wait so completed scrapers are collected even if
+    others are still running when the timeout fires.
+    """
     scrapers = [
         # ── Original sources ──────────────────────────────────────
         IntershalaScraper(),
@@ -44,30 +44,40 @@ async def _run_scrapers() -> list[dict]:
         GreenhouseScraper(),
         # ── Lever ATS (18 companies incl. OpenAI, Netflix) ───────
         LeverScraper(),
-        # ── Tier-2: unofficial APIs ───────────────────────────────
-        GoogleCareersScraper(),
-        MicrosoftCareersScraper(),
-        AmazonJobsScraper(),
     ]
-    tasks = [s.scrape() for s in scrapers]
+
+    # Wrap coroutines in named Tasks so we can inspect results
+    tasks = {asyncio.ensure_future(s.scrape()): s for s in scrapers}
+    all_opps: list[dict] = []
 
     try:
-        results_nested = await asyncio.wait_for(
-            asyncio.gather(*tasks, return_exceptions=True),
+        done, pending = await asyncio.wait(
+            tasks.keys(),
             timeout=SCRAPER_TIMEOUT,
         )
-    except asyncio.TimeoutError:
-        logger.warning("Scrapers timed out after %ds — proceeding with partial results", SCRAPER_TIMEOUT)
-        results_nested = []
 
-    all_opps: list[dict] = []
-    for res in results_nested:
-        if isinstance(res, Exception):
-            logger.error("Scraper failed: %s", res)
-        else:
-            all_opps.extend(res)
+        if pending:
+            logger.warning(
+                "Scrapers timed out after %ds — %d finished, %d still running (cancelled)",
+                SCRAPER_TIMEOUT, len(done), len(pending),
+            )
+            for t in pending:
+                t.cancel()
 
-    # Close clients
+        # Collect results from tasks that finished
+        for task in done:
+            exc = task.exception()
+            if exc:
+                logger.error("Scraper failed: %s", exc)
+            else:
+                result = task.result()
+                if isinstance(result, list):
+                    all_opps.extend(result)
+
+    except Exception as exc:
+        logger.error("Unexpected error in _run_scrapers: %s", exc)
+
+    # Close all HTTP clients
     for s in scrapers:
         try:
             await s.close()

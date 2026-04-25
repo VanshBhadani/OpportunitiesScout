@@ -5,8 +5,14 @@
 
 import axios from 'axios'
 
+// In production (Vercel), VITE_API_URL points to the Render backend.
+// In local dev, Vite proxies /api → localhost:8000 so we use /api.
+const baseURL = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : '/api'
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL,
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 })
@@ -58,5 +64,13 @@ export const sendDigest = () => api.post('/email/send-digest').then(r => r.data)
 
 export const getGlmStatus = () =>
   api.get('/glm/status', { timeout: 3000 }).then(r => r.data)
+
+// ── AI Provider config ────────────────────────────────────────────
+
+export const getAiProvider = () =>
+  api.get('/config/provider').then(r => r.data)
+
+export const setAiProvider = (provider) =>
+  api.post('/config/provider', { provider }).then(r => r.data)
 
 export default api

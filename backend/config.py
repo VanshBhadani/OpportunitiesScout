@@ -8,7 +8,12 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    # AI — Z.AI / GLM
+    # AI — NVIDIA NIM (primary)
+    nvidia_api_key: str = ""
+    nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
+    nvidia_model: str = "minimaxai/minimax-m2.5"
+
+    # AI — ZhipuAI GLM (legacy fallback, kept for .env compat)
     zhipuai_api_key: str = ""
     zhipuai_base_url: str = "https://api.z.ai/api/paas/v4/"
     zhipuai_model: str = "glm-4.7-flash"

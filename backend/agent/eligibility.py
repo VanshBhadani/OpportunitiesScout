@@ -21,6 +21,7 @@ from typing import Any
 from openai import OpenAI
 from backend.config import get_settings
 from backend import glm_status
+from backend.ai_provider import get_provider
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -34,25 +35,33 @@ _DEFAULT = {"eligible": False, "score": 0.0, "reason": "Could not evaluate"}
 #   output tokens  ≈ N × 30
 # At N=50 this can exceed 6000 tokens, causing the model to truncate and
 # return empty content. Keeping N ≤ 15 keeps total well under 4096.
-SUB_BATCH_SIZE = 15
+SUB_BATCH_SIZE = 10
 
 
-# ─── Client factory ───────────────────────────────────────────────
+# ─── Client factory ──────────────────────────────────────────────────
 
 def _client() -> OpenAI:
+    """Return an OpenAI-compatible client for whichever provider is active."""
+    provider = get_provider()
+    if provider == "glm":
+        return OpenAI(
+            api_key=settings.zhipuai_api_key,
+            base_url=settings.zhipuai_base_url,
+            max_retries=4,
+            timeout=90.0,
+        )
+    # default: nvidia
     return OpenAI(
-        api_key=settings.zhipuai_api_key,
-        base_url=settings.zhipuai_base_url,
+        api_key=settings.nvidia_api_key,
+        base_url=settings.nvidia_base_url,
+        max_retries=4,
+        timeout=90.0,
     )
-
-MODEL = None  # resolved lazily from settings
 
 
 def _model() -> str:
-    global MODEL
-    if MODEL is None:
-        MODEL = settings.zhipuai_model
-    return MODEL
+    provider = get_provider()
+    return settings.zhipuai_model if provider == "glm" else settings.nvidia_model
 
 
 # ─── Helpers ──────────────────────────────────────────────────────
@@ -163,7 +172,8 @@ def _call_glm_batch(profile_str: str, compact_opps: list[dict]) -> list[dict] | 
                 {"role": "user",   "content": user_msg},
             ],
             temperature=0.1,
-            max_tokens=4096,
+            top_p=0.95,
+            max_tokens=8192,
         )
     finally:
         glm_status.release(call_id)
@@ -211,6 +221,10 @@ def batch_check_eligibility(
 
         # Re-index from 0 within this sub-batch
         compact  = [_compact(i, opp) for i, opp in enumerate(sub_opps)]
+
+        # Small pause between sub-batches — reduces hammering ZhipuAI's free tier
+        if start > 0:
+            import time; time.sleep(0.8)
 
         try:
             arr = _call_glm_batch(profile_str, compact)
