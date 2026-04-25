@@ -74,7 +74,8 @@ export const getGlmStatus = () =>
 export const getAiProvider = () =>
   api.get('/config/provider').then(r => r.data)
 
-export const setAiProvider = (provider) =>
-  api.post('/config/provider', { provider }).then(r => r.data)
+export const setAiProvider = (config) =>
+  api.post('/config/provider', config).then(r => r.data)
+
 
 export default api

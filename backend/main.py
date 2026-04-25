@@ -30,7 +30,7 @@ from backend.agent.runner import run_pipeline
 from backend.email.digest import send_digest
 from backend.scheduler import start_scheduler, stop_scheduler
 from backend import glm_status
-from backend.ai_provider import get_provider, set_provider
+from backend.ai_provider import get_provider, get_config, set_provider as _set_provider
 from backend import progress as run_progress
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
@@ -315,9 +315,14 @@ async def parse_resume(file: UploadFile = File(...)):
     # 3. Trim to ~4000 chars so we don't overflow the prompt
     resume_trimmed = resume_text[:4000]
 
-    # 4. Ask NVIDIA/GLM to extract structured fields
-    provider = get_provider()
-    if provider == "glm":
+    # 4. Ask AI to extract structured fields using active provider
+    cfg = get_config()
+    _provider = cfg["provider"]
+    if _provider == "custom":
+        _api_key  = cfg["custom_api_key"]
+        _base_url = cfg["custom_base_url"]
+        _model    = cfg["custom_model"]
+    elif _provider == "glm":
         _api_key  = settings.zhipuai_api_key
         _base_url = settings.zhipuai_base_url
         _model    = settings.zhipuai_model
@@ -471,8 +476,13 @@ def tailor_opportunity(opp_id: int, db: Session = Depends(get_db)):
     )
 
     try:
-        _provider = get_provider()
-        if _provider == "glm":
+        cfg = get_config()
+        _provider = cfg["provider"]
+        if _provider == "custom":
+            _api_key  = cfg["custom_api_key"]
+            _base_url = cfg["custom_base_url"]
+            _model    = cfg["custom_model"]
+        elif _provider == "glm":
             _api_key  = settings.zhipuai_api_key
             _base_url = settings.zhipuai_base_url
             _model    = settings.zhipuai_model
@@ -653,20 +663,26 @@ def trigger_digest(db: Session = Depends(get_db)):
 
 @app.get("/api/config/provider", tags=["Config"])
 def get_active_provider():
-    """Return the currently active AI provider."""
-    return {"provider": get_provider()}
+    """Return the currently active AI provider config."""
+    return get_config()
 
 
 @app.post("/api/config/provider", tags=["Config"])
 def set_active_provider(body: dict):
-    """Set the active AI provider ('nvidia' or 'glm')."""
+    """Set the active AI provider. For 'custom', also accepts custom_api_key, custom_base_url, custom_model."""
     provider = body.get("provider", "")
     try:
-        new = set_provider(provider)
-        logger.info("AI provider switched to: %s", new)
-        return {"provider": new}
+        new = _set_provider(
+            provider,
+            custom_api_key=body.get("custom_api_key", ""),
+            custom_base_url=body.get("custom_base_url", ""),
+            custom_model=body.get("custom_model", ""),
+        )
+        logger.info("AI provider switched to: %s", provider)
+        return new
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
 
 
 # ── Dev entry point ────────────────────────────────────────────────

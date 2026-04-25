@@ -79,6 +79,11 @@ export default function RunAgent() {
   // ── Pre-run config ─────────────────────────────────────────────
   const [maxProcess, setMaxProcess] = useState(50)
   const [processAll, setProcessAll] = useState(false)
+  // ── Custom AI provider ─────────────────────────────────────────
+  const [customApiKey, setCustomApiKey] = useState('')
+  const [customBaseUrl, setCustomBaseUrl] = useState('https://integrate.api.nvidia.com/v1')
+  const [customModel, setCustomModel] = useState('')
+  const [showCustomFields, setShowCustomFields] = useState(false)
   const pollRef = useRef(null)
   const progressPollRef = useRef(null)
   const progressEndRef = useRef(null)
@@ -206,11 +211,31 @@ export default function RunAgent() {
     if (newProvider === provider || switchingProvider) return
     setSwitchingProvider(true)
     try {
-      const data = await setAiProvider(newProvider)
+      const payload = newProvider === 'custom'
+        ? { provider: 'custom', custom_api_key: customApiKey, custom_base_url: customBaseUrl, custom_model: customModel }
+        : { provider: newProvider }
+      const data = await setAiProvider(payload)
       setProvider(data.provider)
-      toast.success(`Switched to ${data.provider === 'nvidia' ? 'NVIDIA NIM' : 'ZhipuAI GLM'}`)
+      setShowCustomFields(data.provider === 'custom')
+      const label = data.provider === 'nvidia' ? 'NVIDIA NIM (Default)' : data.provider === 'glm' ? 'ZhipuAI GLM' : 'Custom Provider'
+      toast.success(`Switched to ${label}`)
     } catch {
       toast.error('Failed to switch provider')
+    } finally {
+      setSwitchingProvider(false)
+    }
+  }
+
+  async function handleSaveCustom() {
+    if (!customModel.trim()) { toast.error('Model name is required'); return }
+    if (!customApiKey.trim()) { toast.error('API key is required'); return }
+    setSwitchingProvider(true)
+    try {
+      const data = await setAiProvider({ provider: 'custom', custom_api_key: customApiKey, custom_base_url: customBaseUrl, custom_model: customModel })
+      setProvider(data.provider)
+      toast.success('Custom provider saved!')
+    } catch {
+      toast.error('Failed to save custom provider')
     } finally {
       setSwitchingProvider(false)
     }
@@ -368,19 +393,31 @@ export default function RunAgent() {
         </div>
 
         {/* AI Provider toggle */}
-        <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-3">
-          <Cpu size={14} className="text-slate-500" />
-          <span className="text-xs text-slate-500 font-medium">AI Provider</span>
-          <div className="flex rounded-xl overflow-hidden border border-white/10 ml-1">
-            {[{ id: 'nvidia', label: 'NVIDIA NIM', color: 'text-green-400' },
-              { id: 'glm',    label: 'ZhipuAI GLM', color: 'text-purple-400' }].map(opt => (
+        <div className="mt-4 pt-4 border-t border-white/5">
+          <div className="flex items-center gap-2 mb-3">
+            <Cpu size={13} className="text-slate-500" />
+            <span className="text-xs text-slate-500 font-medium">AI Provider</span>
+          </div>
+
+          {/* Provider tabs */}
+          <div className="flex rounded-xl overflow-hidden border border-white/10 mb-3">
+            {[
+              { id: 'nvidia', label: '⚡ Default (NVIDIA NIM)', desc: 'Uses built-in API key' },
+              { id: 'glm',    label: 'ZhipuAI GLM',             desc: 'Uses ZHIPUAI_API_KEY' },
+              { id: 'custom', label: '🔧 Custom',                desc: 'Your own API key + model' },
+            ].map(opt => (
               <button
                 key={opt.id}
-                onClick={() => handleProviderSwitch(opt.id)}
+                onClick={() => {
+                  if (opt.id === 'custom') { setShowCustomFields(true); if (provider !== 'custom') return }
+                  handleProviderSwitch(opt.id)
+                }}
                 disabled={switchingProvider}
-                className={`px-3 py-1.5 text-xs font-medium transition-all ${
+                className={`flex-1 px-3 py-2 text-xs font-medium transition-all ${
                   provider === opt.id
-                    ? `bg-white/10 ${opt.color}`
+                    ? opt.id === 'nvidia' ? 'bg-white/10 text-green-400'
+                      : opt.id === 'glm'  ? 'bg-white/10 text-purple-400'
+                      : 'bg-white/10 text-orange-400'
                     : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
                 }`}
               >
@@ -389,9 +426,56 @@ export default function RunAgent() {
               </button>
             ))}
           </div>
-          <span className="text-xs text-slate-600 ml-auto">
-            {provider === 'nvidia' ? 'minimaxai/minimax-m2.5' : 'glm-4.7-flash'}
-          </span>
+
+          {/* Current provider info or custom fields */}
+          {provider !== 'custom' ? (
+            <div className="text-xs text-slate-600">
+              {provider === 'nvidia' ? '⚡ minimaxai/minimax-m2.5 via NVIDIA NIM (default key)'
+                : '🔮 glm-4.7-flash via ZhipuAI Z.AI'}
+            </div>
+          ) : (
+            <div className="space-y-2 mt-2">
+              <div className="text-xs text-orange-400/80 mb-2">Custom provider settings are saved and used for all AI calls until you switch back.</div>
+              <div>
+                <label className="text-xs text-slate-500 block mb-1">API Key *</label>
+                <input
+                  type="password"
+                  value={customApiKey}
+                  onChange={e => setCustomApiKey(e.target.value)}
+                  placeholder="sk-..."
+                  className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-orange-400/50"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 block mb-1">Base URL *</label>
+                <input
+                  type="text"
+                  value={customBaseUrl}
+                  onChange={e => setCustomBaseUrl(e.target.value)}
+                  placeholder="https://integrate.api.nvidia.com/v1"
+                  className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-orange-400/50"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 block mb-1">Model Name *</label>
+                <input
+                  type="text"
+                  value={customModel}
+                  onChange={e => setCustomModel(e.target.value)}
+                  placeholder="e.g. meta/llama-3.1-70b-instruct"
+                  className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-orange-400/50"
+                />
+              </div>
+              <button
+                onClick={handleSaveCustom}
+                disabled={switchingProvider}
+                className="w-full py-1.5 text-xs font-medium bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/30 text-orange-300 rounded-lg transition-all disabled:opacity-50"
+              >
+                {switchingProvider ? <Loader2 size={10} className="animate-spin inline mr-1" /> : null}
+                Save &amp; Use Custom Provider
+              </button>
+            </div>
+          )}
         </div>
 
 

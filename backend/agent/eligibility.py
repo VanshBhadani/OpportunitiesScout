@@ -21,7 +21,7 @@ from typing import Any
 from openai import OpenAI
 from backend.config import get_settings
 from backend import glm_status
-from backend.ai_provider import get_provider
+from backend.ai_provider import get_provider, get_config
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -42,7 +42,15 @@ SUB_BATCH_SIZE = 10
 
 def _client() -> OpenAI:
     """Return an OpenAI-compatible client for whichever provider is active."""
-    provider = get_provider()
+    cfg = get_config()
+    provider = cfg["provider"]
+    if provider == "custom":
+        return OpenAI(
+            api_key=cfg["custom_api_key"],
+            base_url=cfg["custom_base_url"],
+            max_retries=4,
+            timeout=90.0,
+        )
     if provider == "glm":
         return OpenAI(
             api_key=settings.zhipuai_api_key,
@@ -60,8 +68,12 @@ def _client() -> OpenAI:
 
 
 def _model() -> str:
-    provider = get_provider()
+    cfg = get_config()
+    provider = cfg["provider"]
+    if provider == "custom":
+        return cfg["custom_model"]
     return settings.zhipuai_model if provider == "glm" else settings.nvidia_model
+
 
 
 # ─── Helpers ──────────────────────────────────────────────────────
