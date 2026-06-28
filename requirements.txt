@@ -22,3 +22,6 @@ openai>=1.30.0
 
 # PostgreSQL driver — required for Supabase / production
 psycopg2-binary==2.9.9
+
+# Transactional email API — replaces SMTP (Render blocks port 587: errno 101)
+resend>=2.0.0
