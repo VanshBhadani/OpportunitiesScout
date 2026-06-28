@@ -24,8 +24,10 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_pass: str = ""
 
-    # Resend HTTP email API (production)
-    resend_api_key: str = ""
+    # Brevo (fka Sendinblue) transactional email API
+    brevo_api_key: str = ""
+    brevo_sender_email: str = "vanshbhadani2005@gmail.com"
+    brevo_sender_name: str = "OpportunityScout"
 
     # Database
     database_url: str = "sqlite:///./opportunityscout.db"

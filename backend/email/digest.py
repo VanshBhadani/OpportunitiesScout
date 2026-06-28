@@ -137,16 +137,23 @@ def send_digest(db: Session) -> None:
     today_str = date.today().strftime("%Y-%m-%d")
     subject = f"🎯 Your Daily Opportunities — {today_str}"
 
-    import resend
-    resend.api_key = settings.resend_api_key
-    params: resend.Emails.SendParams = {
-        "from": "OpportunityScout <onboarding@resend.dev>",
-        "to": [profile.email],
-        "subject": subject,
-        "html": html_body,
-    }
-    response = resend.Emails.send(params)
-    logger.info("Digest sent via Resend to %s (id=%s)", profile.email, response.get("id"))
+    import sib_api_v3_sdk
+    from sib_api_v3_sdk.rest import ApiException
+
+    configuration = sib_api_v3_sdk.Configuration()
+    configuration.api_key["api-key"] = settings.brevo_api_key
+
+    api_instance = sib_api_v3_sdk.TransactionalEmailsApi(
+        sib_api_v3_sdk.ApiClient(configuration)
+    )
+    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
+        to=[{"email": profile.email, "name": profile.name or "User"}],
+        sender={"email": settings.brevo_sender_email, "name": settings.brevo_sender_name},
+        subject=subject,
+        html_content=html_body,
+    )
+    response = api_instance.send_transac_email(send_smtp_email)
+    logger.info("Digest sent via Brevo to %s (messageId=%s)", profile.email, response.message_id)
 
     # Mark sent
     for opp in opps:
