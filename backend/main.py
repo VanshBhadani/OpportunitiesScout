@@ -654,7 +654,9 @@ def trigger_digest(db: Session = Depends(get_db)):
         send_digest(db)
         return {"message": "Digest sent successfully"}
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        error_detail = f"{type(exc).__name__}: {exc}"
+        logger.error("send-digest failed: %s", error_detail)
+        raise HTTPException(status_code=500, detail=error_detail)
 
 
 # ═══════════════════════════════════════════════════════════════════
