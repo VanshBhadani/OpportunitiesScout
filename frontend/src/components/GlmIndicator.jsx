@@ -44,28 +44,29 @@ export default function GlmIndicator() {
         const data = await getGlmStatus()
         if (!alive) return
 
-        // Success — reset failure counter & go back to 1s cadence
+        // Success — reset failure counter
         failsRef.current = 0
 
         setStatus(data)
         if (data.active) {
           setVisible(true)
           clearTimeout(timerRef.current)
+          // Poll fast (1s) only while AI is actively running
+          pollRef.current = setTimeout(poll, 1000)
         } else {
           timerRef.current = setTimeout(() => setVisible(false), 1500)
+          // Poll slowly (10s) when idle — avoids spamming Render logs
+          pollRef.current = setTimeout(poll, 10_000)
         }
-
-        // Schedule next poll in 1 second
-        pollRef.current = setTimeout(poll, 1000)
       } catch {
         if (!alive) return
         // Backend unreachable — hide indicator
         setVisible(false)
         failsRef.current += 1
 
-        // Backoff: 1s → 2s → 5s → 10s (cap) so Vite terminal stays quiet
+        // Backoff: 2s → 5s → 30s (cap) so logs stay quiet
         const delay = failsRef.current >= 3
-          ? 10_000        // backend is clearly down — check every 10s
+          ? 30_000
           : failsRef.current === 2
             ? 5_000
             : 2_000
