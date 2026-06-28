@@ -652,16 +652,21 @@ def agent_progress(run_id: int):
 def trigger_digest(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Queue the digest email as a background task so the request returns immediately."""
     def _send():
+        logger.info("Background digest task started")
         from backend.db.database import SessionLocal
         bg_db = SessionLocal()
         try:
+            logger.info("Background digest: DB session created, calling send_digest")
             send_digest(bg_db)
+            logger.info("Background digest: send_digest completed successfully")
         except Exception as exc:
-            logger.error("Background digest error: %s", exc)
+            logger.error("Background digest error (%s): %s", type(exc).__name__, exc, exc_info=True)
         finally:
             bg_db.close()
+            logger.info("Background digest task finished")
 
     background_tasks.add_task(_send)
+    logger.info("Digest background task queued")
     return {"message": "Digest queued — email will arrive shortly"}
 
 
