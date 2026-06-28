@@ -1,14 +1,12 @@
 # ─────────────────────────────────────────────────────────────────
-# email/digest.py — HTML email digest builder + Gmail SMTP sender
-# Sends top-10 ranked eligible opportunities as a formatted table.
+# email/digest.py — HTML email digest builder + sender
+# Uses Resend API in production (Render blocks SMTP port 587).
+# Falls back to Gmail SMTP for local development.
 # Subject: "🎯 Your Daily Opportunities — {date}"
 # ─────────────────────────────────────────────────────────────────
 
-import smtplib
 import logging
 from datetime import date
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from sqlalchemy.orm import Session
 
 from backend.db.models import Opportunity, Profile
@@ -140,25 +138,36 @@ def send_digest(db: Session) -> None:
     today_str = date.today().strftime("%Y-%m-%d")
     subject = f"🎯 Your Daily Opportunities — {today_str}"
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = settings.smtp_user
-    msg["To"] = profile.email
-    msg.attach(MIMEText(html_body, "html"))
-
-    try:
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+    if settings.resend_api_key:
+        # ── Resend API (production — works on Render free tier) ──────
+        import resend
+        resend.api_key = settings.resend_api_key
+        params: resend.Emails.SendParams = {
+            "from": f"OpportunityScout <onboarding@resend.dev>",
+            "to": [profile.email],
+            "subject": subject,
+            "html": html_body,
+        }
+        response = resend.Emails.send(params)
+        logger.info("Digest sent via Resend to %s (id=%s)", profile.email, response.get("id"))
+    else:
+        # ── SMTP fallback (local dev only) ───────────────────────────
+        import smtplib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = settings.smtp_user
+        msg["To"] = profile.email
+        msg.attach(MIMEText(html_body, "html"))
+        with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15) as server:
             server.ehlo()
             server.starttls()
             server.login(settings.smtp_user, settings.smtp_pass)
             server.sendmail(settings.smtp_user, profile.email, msg.as_string())
-        logger.info("Digest sent to %s", profile.email)
+        logger.info("Digest sent via SMTP to %s", profile.email)
 
-        # Mark sent
-        for opp in opps:
-            opp.is_sent = True
-        db.commit()
-
-    except Exception as exc:
-        logger.error("Failed to send digest: %s", exc)
-        raise
+    # Mark sent
+    for opp in opps:
+        opp.is_sent = True
+    db.commit()
