@@ -246,8 +246,9 @@ export default function RunAgent() {
     try {
       await sendDigest()
       toast.success('Digest email sent!')
-    } catch {
-      toast.error('Failed to send digest — check SMTP settings')
+    } catch (err) {
+      const detail = err?.response?.data?.detail || err?.message || 'Unknown error'
+      toast.error(`SMTP Error: ${detail}`)
     } finally {
       setSendingDigest(false)
     }
