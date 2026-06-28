@@ -649,14 +649,20 @@ def agent_progress(run_id: int):
 # ═══════════════════════════════════════════════════════════════════
 
 @app.post("/api/email/send-digest", tags=["Email"])
-def trigger_digest(db: Session = Depends(get_db)):
-    try:
-        send_digest(db)
-        return {"message": "Digest sent successfully"}
-    except Exception as exc:
-        error_detail = f"{type(exc).__name__}: {exc}"
-        logger.error("send-digest failed: %s", error_detail)
-        raise HTTPException(status_code=500, detail=error_detail)
+def trigger_digest(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Queue the digest email as a background task so the request returns immediately."""
+    def _send():
+        from backend.db.database import SessionLocal
+        bg_db = SessionLocal()
+        try:
+            send_digest(bg_db)
+        except Exception as exc:
+            logger.error("Background digest error: %s", exc)
+        finally:
+            bg_db.close()
+
+    background_tasks.add_task(_send)
+    return {"message": "Digest queued — email will arrive shortly"}
 
 
 # ═══════════════════════════════════════════════════════════════════

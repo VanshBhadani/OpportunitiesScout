@@ -18,14 +18,11 @@ class Settings(BaseSettings):
     zhipuai_base_url: str = "https://api.z.ai/api/paas/v4/"
     zhipuai_model: str = "glm-4.7-flash"
 
-    # Email / SMTP (legacy — kept for local dev fallback)
+    # Email / SMTP
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_pass: str = ""
-
-    # Resend transactional email API (preferred in production)
-    resend_api_key: str = ""
 
     # Database
     database_url: str = "sqlite:///./opportunityscout.db"
