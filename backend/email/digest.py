@@ -1,15 +1,15 @@
 # ─────────────────────────────────────────────────────────────────
-# email/digest.py — HTML email digest builder + Gmail SMTP sender
-# Sends top-10 ranked eligible opportunities as a formatted table.
+# email/digest.py — HTML email digest builder + Brevo API sender
+# Uses Brevo REST API via sib-api-v3-sdk (HTTP, not SMTP).
+# Render free tier blocks port 587; HTTP API works fine.
 # Subject: "🎯 Your Daily Opportunities — {date}"
 # ─────────────────────────────────────────────────────────────────
 
-import smtplib
 import logging
 from datetime import date
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from sqlalchemy.orm import Session
+import sib_api_v3_sdk
+from sib_api_v3_sdk.rest import ApiException
 
 from backend.db.models import Opportunity, Profile
 from backend.config import get_settings
@@ -140,25 +140,28 @@ def send_digest(db: Session) -> None:
     today_str = date.today().strftime("%Y-%m-%d")
     subject = f"🎯 Your Daily Opportunities — {today_str}"
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = settings.smtp_user
-    msg["To"] = profile.email
-    msg.attach(MIMEText(html_body, "html"))
+    # Configure Brevo API client
+    configuration = sib_api_v3_sdk.Configuration()
+    configuration.api_key["api-key"] = settings.brevo_api_key
+
+    api_instance = sib_api_v3_sdk.TransactionalEmailsApi(
+        sib_api_v3_sdk.ApiClient(configuration)
+    )
+    email_obj = sib_api_v3_sdk.SendSmtpEmail(
+        sender={"email": settings.brevo_sender_email, "name": settings.brevo_sender_name},
+        to=[{"email": profile.email, "name": profile.name or "User"}],
+        subject=subject,
+        html_content=html_body,
+    )
 
     try:
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
-            server.ehlo()
-            server.starttls()
-            server.login(settings.smtp_user, settings.smtp_pass)
-            server.sendmail(settings.smtp_user, profile.email, msg.as_string())
-        logger.info("Digest sent to %s", profile.email)
-
-        # Mark sent
-        for opp in opps:
-            opp.is_sent = True
-        db.commit()
-
-    except Exception as exc:
-        logger.error("Failed to send digest: %s", exc)
+        response = api_instance.send_transac_email(email_obj)
+        logger.info("Digest sent via Brevo to %s (messageId=%s)", profile.email, response.message_id)
+    except ApiException as exc:
+        logger.error("Brevo API error: %s", exc)
         raise
+
+    # Mark sent
+    for opp in opps:
+        opp.is_sent = True
+    db.commit()
