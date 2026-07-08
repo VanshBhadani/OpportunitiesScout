@@ -18,16 +18,11 @@ class Settings(BaseSettings):
     zhipuai_base_url: str = "https://api.z.ai/api/paas/v4/"
     zhipuai_model: str = "glm-4.7-flash"
 
-    # Email / SMTP (kept for reference, not used — Render blocks port 587)
+    # Email / SMTP
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_pass: str = ""
-
-    # Brevo (fka Sendinblue) transactional email API
-    brevo_api_key: str = ""
-    brevo_sender_email: str = "vanshbhadani2005@gmail.com"
-    brevo_sender_name: str = "OpportunityScout"
 
     # Database
     database_url: str = "sqlite:///./opportunityscout.db"

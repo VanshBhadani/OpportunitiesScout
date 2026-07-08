@@ -1,11 +1,14 @@
 # ─────────────────────────────────────────────────────────────────
-# email/digest.py — HTML email digest builder + Resend API sender
-# Uses Resend HTTP API (SMTP port 587 is blocked on Render free tier).
+# email/digest.py — HTML email digest builder + Gmail SMTP sender
+# Sends top-10 ranked eligible opportunities as a formatted table.
 # Subject: "🎯 Your Daily Opportunities — {date}"
 # ─────────────────────────────────────────────────────────────────
 
+import smtplib
 import logging
 from datetime import date
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from sqlalchemy.orm import Session
 
 from backend.db.models import Opportunity, Profile
@@ -137,25 +140,25 @@ def send_digest(db: Session) -> None:
     today_str = date.today().strftime("%Y-%m-%d")
     subject = f"🎯 Your Daily Opportunities — {today_str}"
 
-    import sib_api_v3_sdk
-    from sib_api_v3_sdk.rest import ApiException
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = settings.smtp_user
+    msg["To"] = profile.email
+    msg.attach(MIMEText(html_body, "html"))
 
-    configuration = sib_api_v3_sdk.Configuration()
-    configuration.api_key["api-key"] = settings.brevo_api_key
+    try:
+        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(settings.smtp_user, settings.smtp_pass)
+            server.sendmail(settings.smtp_user, profile.email, msg.as_string())
+        logger.info("Digest sent to %s", profile.email)
 
-    api_instance = sib_api_v3_sdk.TransactionalEmailsApi(
-        sib_api_v3_sdk.ApiClient(configuration)
-    )
-    send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(
-        to=[{"email": profile.email, "name": profile.name or "User"}],
-        sender={"email": settings.brevo_sender_email, "name": settings.brevo_sender_name},
-        subject=subject,
-        html_content=html_body,
-    )
-    response = api_instance.send_transac_email(send_smtp_email)
-    logger.info("Digest sent via Brevo to %s (messageId=%s)", profile.email, response.message_id)
+        # Mark sent
+        for opp in opps:
+            opp.is_sent = True
+        db.commit()
 
-    # Mark sent
-    for opp in opps:
-        opp.is_sent = True
-    db.commit()
+    except Exception as exc:
+        logger.error("Failed to send digest: %s", exc)
+        raise
