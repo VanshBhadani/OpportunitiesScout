@@ -304,7 +304,7 @@ export default function RunAgent() {
             <p className="text-sm text-muted mt-0.5">
               Scrapes Internshala, Unstop &amp; Devpost · Checks eligibility via{' '}
               <span className={provider === 'nvidia' ? 'text-success' : 'text-ink2'}>
-                {provider === 'nvidia' ? 'NVIDIA NIM (minimax-m2.5)' : 'ZhipuAI GLM-4-Flash'}
+                {provider === 'nvidia' ? 'NVIDIA NIM (llama-3.3-70b)' : 'ZhipuAI GLM-4-Flash'}
               </span>
               {' '}· Ranks results
             </p>
@@ -431,7 +431,7 @@ export default function RunAgent() {
           {provider !== 'custom' ? (
             <p className="text-xs text-muted">
               {provider === 'nvidia'
-                ? 'minimaxai/minimax-m2.5 via NVIDIA NIM (default key).'
+                ? 'meta/llama-3.3-70b-instruct via NVIDIA NIM (default key).'
                 : 'glm-4.7-flash via ZhipuAI Z.AI.'}
             </p>
           ) : (

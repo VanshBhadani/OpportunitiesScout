@@ -354,23 +354,37 @@ async def parse_resume(file: UploadFile = File(...)):
                 ],
                 temperature=0.1,
                 top_p=0.95,
-                max_tokens=4096,
+                max_tokens=8192,
             )
         finally:
             glm_status.release(_call_id)
         msg = response.choices[0].message
         raw = _get_raw(msg)
-        logger.debug("[parse-resume] GLM raw (first 400): %s", raw[:400])
+        logger.info("[parse-resume] AI raw length=%d (first 400): %s", len(raw), raw[:400])
 
         # Robust JSON extraction — handles markdown fences, reasoning models, etc.
         parsed = _extract_json(raw)
     except Exception as exc:
-        logger.error("GLM resume parse failed: %s", exc)
+        logger.error("Resume parse AI call failed: %s", exc, exc_info=True)
+        msg = str(exc)
+        # Detect likely token-budget truncation from reasoning models
+        is_truncation = (
+            "No valid JSON object found" in msg
+            or "Empty GLM response" in msg
+            or "Empty response" in msg
+        )
+        warning = (
+            "AI response was truncated (reasoning model ran out of tokens). "
+            "Try a smaller resume or a non-reasoning model."
+            if is_truncation
+            else f"AI extraction failed: {msg}. Resume text extracted, fill fields manually."
+        )
         return JSONResponse({
             "name": "", "email": "", "cgpa": None,
             "skills": [], "preferred_roles": [],
             "resume_text": resume_text,
-            "warning": "AI extraction failed — resume text extracted, fill fields manually."
+            "warning": warning,
+            "error": msg,
         })
 
     return {
@@ -525,7 +539,7 @@ def tailor_opportunity(opp_id: int, db: Session = Depends(get_db)):
         }
 
     except Exception as exc:
-        logger.error("Tailor endpoint failed for opp %d: %s", opp_id, exc)
+        logger.error("Tailor endpoint failed for opp %d: %s", opp_id, exc, exc_info=True)
         raise HTTPException(status_code=500, detail=f"AI analysis failed: {exc}")
 
 

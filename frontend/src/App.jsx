@@ -1,6 +1,6 @@
 // ────────────────────────────────────────────────────────────────
 // App.jsx — Root component with split-workspace shell
-// Dark sidebar + light content area. Splash + GLM indicator.
+// Dark sidebar + light content area. Splash screen.
 // ────────────────────────────────────────────────────────────────
 
 import { useState, useCallback } from 'react'
@@ -9,7 +9,6 @@ import Navbar from './components/Navbar'
 import Dashboard from './pages/Dashboard'
 import Profile from './pages/Profile'
 import RunAgent from './pages/RunAgent'
-import GlmIndicator from './components/GlmIndicator'
 import SplashScreen from './components/SplashScreen'
 
 function AppInner() {
@@ -42,7 +41,6 @@ function AppInner() {
         </main>
       </div>
 
-      {!showSplash && <GlmIndicator />}
     </div>
   )
 }
