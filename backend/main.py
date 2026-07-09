@@ -312,8 +312,8 @@ async def parse_resume(file: UploadFile = File(...)):
     if not resume_text:
         raise HTTPException(status_code=422, detail="PDF appears to have no extractable text (scanned image?).")
 
-    # 3. Trim to ~2000 chars — resume parsing needs very little text for the JSON fields
-    resume_trimmed = resume_text[:2000]
+    # 3. Trim to ~3000 chars — enough for all key fields without flooding the prompt
+    resume_trimmed = resume_text[:3000]
 
     # 4. Ask AI to extract structured fields using active provider
     cfg = get_config()
@@ -331,11 +331,18 @@ async def parse_resume(file: UploadFile = File(...)):
         _base_url = settings.nvidia_base_url
         _model    = settings.nvidia_model
 
+    # Explicit schema keeps the model on-track and prevents preamble text
     prompt = (
-        "Extract fields from this resume. "
-        "Reply with ONLY this JSON, no markdown:\n"
-        '{"name":"","email":"","cgpa":null,"skills":[],"preferred_roles":[]}\n\n'
-        f"Resume:\n{resume_trimmed}"
+        "You are a resume parser. Extract EXACTLY these fields and return ONLY valid JSON.\n"
+        "Rules:\n"
+        "- name: full name string (empty string if not found)\n"
+        "- email: email address string (empty string if not found)\n"
+        "- cgpa: GPA/CGPA as a float (null if not found)\n"
+        "- skills: up to 10 technical skills as short strings\n"
+        "- preferred_roles: up to 5 job role strings inferred from the resume\n\n"
+        "Output format (return ONLY this JSON, no markdown, no explanation):\n"
+        '{"name":"...","email":"...","cgpa":null,"skills":["sk1","sk2"],"preferred_roles":["role1"]}\n\n'
+        f"Resume text:\n{resume_trimmed}"
     )
 
     try:
@@ -343,57 +350,65 @@ async def parse_resume(file: UploadFile = File(...)):
         client = OpenAI(
             api_key=_api_key,
             base_url=_base_url,
-            http_client=httpx.Client(timeout=60.0),  # hard 60s cap on AI call
+            http_client=httpx.Client(timeout=60.0),
         )
         _call_id = glm_status.acquire("Resume parse")
         try:
             response = client.chat.completions.create(
                 model=_model,
                 messages=[
-                    {"role": "system", "content": "You extract structured data from resumes. Reply with ONLY a compact JSON object, no explanation."},
+                    {"role": "system", "content": "You are a precise resume parser. Always reply with ONLY a valid JSON object. Never add explanations or markdown."},
                     {"role": "user",   "content": prompt},
                 ],
-                temperature=0.1,
-                max_tokens=600,   # JSON output is tiny — was 8192 (caused 2-min timeouts)
+                temperature=0.0,   # deterministic — reduces random omissions
+                max_tokens=900,    # 10 skills × ~8 tokens + 5 roles × ~6 tokens + overhead ≈ 200; 900 is safe headroom
             )
         finally:
             glm_status.release(_call_id)
-        msg = response.choices[0].message
-        raw = _get_raw(msg)
-        logger.info("[parse-resume] AI raw length=%d (first 400): %s", len(raw), raw[:400])
+
+        choice = response.choices[0]
+        msg    = choice.message
+        finish = choice.finish_reason
+        raw    = _get_raw(msg)
+        logger.info("[parse-resume] finish=%s raw_len=%d preview: %s", finish, len(raw), raw[:300])
+
+        # If model was cut off mid-JSON, treat as truncation failure
+        if finish == "length":
+            logger.warning("[parse-resume] Output truncated (finish_reason=length) — raw: %s", raw[:400])
+            return JSONResponse({
+                "name": "", "email": "", "cgpa": None,
+                "skills": [], "preferred_roles": [],
+                "resume_text": resume_text,
+                "warning": "AI output was cut off. Some fields could not be filled — please fill them manually.",
+            })
 
         # Robust JSON extraction — handles markdown fences, reasoning models, etc.
         parsed = _extract_json(raw)
+
     except Exception as exc:
         logger.error("Resume parse AI call failed: %s", exc, exc_info=True)
-        msg = str(exc)
-        # Detect likely token-budget truncation from reasoning models
-        is_truncation = (
-            "No valid JSON object found" in msg
-            or "Empty GLM response" in msg
-            or "Empty response" in msg
-        )
+        err_msg = str(exc)
+        is_truncation = any(k in err_msg for k in ("No valid JSON", "Empty GLM", "Empty response"))
         warning = (
-            "AI response was truncated (reasoning model ran out of tokens). "
-            "Try a smaller resume or a non-reasoning model."
+            "AI response was incomplete. Try re-uploading or fill fields manually."
             if is_truncation
-            else f"AI extraction failed: {msg}. Resume text extracted, fill fields manually."
+            else f"AI extraction failed: {err_msg}"
         )
         return JSONResponse({
             "name": "", "email": "", "cgpa": None,
             "skills": [], "preferred_roles": [],
             "resume_text": resume_text,
             "warning": warning,
-            "error": msg,
+            "error": err_msg,
         })
 
     return {
         "name":            str(parsed.get("name") or "").strip(),
         "email":           str(parsed.get("email") or "").strip(),
         "cgpa":            float(parsed["cgpa"]) if parsed.get("cgpa") else None,
-        "skills":          [s for s in (parsed.get("skills") or []) if isinstance(s, str)][:30],
+        "skills":          [s for s in (parsed.get("skills") or []) if isinstance(s, str)][:20],
         "preferred_roles": [r for r in (parsed.get("preferred_roles") or []) if isinstance(r, str)][:10],
-        "resume_text":     resume_text,   # full text for AI matching
+        "resume_text":     resume_text,
     }
 
 
