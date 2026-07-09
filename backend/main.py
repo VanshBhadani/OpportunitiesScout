@@ -312,8 +312,8 @@ async def parse_resume(file: UploadFile = File(...)):
     if not resume_text:
         raise HTTPException(status_code=422, detail="PDF appears to have no extractable text (scanned image?).")
 
-    # 3. Trim to ~4000 chars so we don't overflow the prompt
-    resume_trimmed = resume_text[:4000]
+    # 3. Trim to ~2000 chars — resume parsing needs very little text for the JSON fields
+    resume_trimmed = resume_text[:2000]
 
     # 4. Ask AI to extract structured fields using active provider
     cfg = get_config()
@@ -332,29 +332,29 @@ async def parse_resume(file: UploadFile = File(...)):
         _model    = settings.nvidia_model
 
     prompt = (
-        "Extract the following fields from this resume text. "
-        "Return ONLY a raw JSON object — no markdown, no explanation:\n"
-        '{"name": "Full Name or empty string", '
-        '"email": "email or empty string", '
-        '"cgpa": numeric float or null, '
-        '"skills": ["list", "of", "technical", "skills"], '
-        '"preferred_roles": ["inferred", "career", "roles"]}\n\n'
+        "Extract fields from this resume. "
+        "Reply with ONLY this JSON, no markdown:\n"
+        '{"name":"","email":"","cgpa":null,"skills":[],"preferred_roles":[]}\n\n'
         f"Resume:\n{resume_trimmed}"
     )
 
     try:
-        client = OpenAI(api_key=_api_key, base_url=_base_url)
+        import httpx
+        client = OpenAI(
+            api_key=_api_key,
+            base_url=_base_url,
+            http_client=httpx.Client(timeout=60.0),  # hard 60s cap on AI call
+        )
         _call_id = glm_status.acquire("Resume parse")
         try:
             response = client.chat.completions.create(
                 model=_model,
                 messages=[
-                    {"role": "system", "content": "You extract structured data from resumes. Always reply with ONLY a JSON object."},
+                    {"role": "system", "content": "You extract structured data from resumes. Reply with ONLY a compact JSON object, no explanation."},
                     {"role": "user",   "content": prompt},
                 ],
                 temperature=0.1,
-                top_p=0.95,
-                max_tokens=8192,
+                max_tokens=600,   # JSON output is tiny — was 8192 (caused 2-min timeouts)
             )
         finally:
             glm_status.release(_call_id)
@@ -505,18 +505,22 @@ def tailor_opportunity(opp_id: int, db: Session = Depends(get_db)):
             _base_url = settings.nvidia_base_url
             _model    = settings.nvidia_model
 
-        client = OpenAI(api_key=_api_key, base_url=_base_url)
+        import httpx
+        client = OpenAI(
+            api_key=_api_key,
+            base_url=_base_url,
+            http_client=httpx.Client(timeout=60.0),  # hard 60s cap
+        )
         _call_id = glm_status.acquire("Job tailor")
         try:
             response = client.chat.completions.create(
                 model=_model,
                 messages=[
-                    {"role": "system", "content": "You are a career coach. Reply with ONLY a JSON object, no markdown."},
+                    {"role": "system", "content": "You are a career coach. Reply with ONLY a compact JSON object, no markdown."},
                     {"role": "user",   "content": prompt},
                 ],
                 temperature=0.3,
-                top_p=0.95,
-                max_tokens=8192,
+                max_tokens=1500,   # short structured JSON — was 8192 (caused timeouts)
             )
         finally:
             glm_status.release(_call_id)
