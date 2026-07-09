@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     # AI — NVIDIA NIM (primary)
     nvidia_api_key: str = ""
     nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
-    nvidia_model: str = "meta/llama-3.3-70b-instruct"
+    nvidia_model: str = "meta/llama-3.1-8b-instruct"
 
     # AI — ZhipuAI GLM (legacy fallback, kept for .env compat)
     zhipuai_api_key: str = ""
