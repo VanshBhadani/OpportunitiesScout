@@ -68,7 +68,7 @@ class Opportunity(Base):
     tags = Column(JSONList, nullable=False, default=list)
 
     # AI fields
-    eligibility_score = Column(Float, nullable=True, default=0.0)
+    eligibility_score = Column(Float, nullable=True, default=None)
     eligibility_reason = Column(Text, nullable=True, default="")
     rank = Column(Integer, nullable=True)
     is_eligible = Column(Boolean, nullable=False, default=False)

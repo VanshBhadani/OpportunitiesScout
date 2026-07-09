@@ -1,6 +1,5 @@
 // ────────────────────────────────────────────────────────────────
 // main.jsx — React app entry point
-// Sets up React Router and renders App inside StrictMode
 // ────────────────────────────────────────────────────────────────
 
 import React from 'react'
@@ -18,13 +17,20 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         position="bottom-right"
         toastOptions={{
           style: {
-            background: '#1a1a2e',
-            color: '#e2e8f0',
-            border: '1px solid rgba(255,255,255,0.1)',
+            background: 'var(--surface)',
+            color: 'var(--ink)',
+            border: '1px solid var(--border-strong)',
             borderRadius: '12px',
+            boxShadow: 'var(--shadow-lg)',
+            fontFamily: 'var(--font-sans)',
+            fontSize: '0.8125rem',
           },
-          success: { iconTheme: { primary: '#6366f1', secondary: '#fff' } },
-          error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
+          success: {
+            iconTheme: { primary: 'var(--accent)', secondary: 'var(--on-accent)' },
+          },
+          error: {
+            iconTheme: { primary: 'var(--danger)', secondary: 'var(--on-accent)' },
+          },
         }}
       />
     </BrowserRouter>

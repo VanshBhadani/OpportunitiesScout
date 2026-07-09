@@ -232,6 +232,15 @@ async def run_pipeline(db: Session, existing_run_id: int | None = None, max_proc
 
         # 5. Eligibility — process in sub-batches of SUB_BATCH_SIZE
         # Use opp_rows (just inserted) + any existing unscored from prior runs
+
+        # Normalize legacy rows that defaulted to 0.0 but were never actually scored
+        # (empty reason distinguishes "never scored" from "scored 0.0 with a reason")
+        db.query(Opportunity).filter(
+            Opportunity.eligibility_score == 0.0,
+            Opportunity.eligibility_reason == "",
+        ).update({Opportunity.eligibility_score: None}, synchronize_session=False)
+        db.commit()
+
         unscored_existing = (
             db.query(Opportunity)
             .filter(Opportunity.eligibility_score.is_(None))
@@ -264,7 +273,7 @@ async def run_pipeline(db: Session, existing_run_id: int | None = None, max_proc
             )
 
             batch_input = [_opp_to_dict(opp_row) for opp_row in sub_batch]
-            results = batch_check_eligibility(profile_dict, batch_input)
+            results = await asyncio.to_thread(batch_check_eligibility, profile_dict, batch_input)
 
             for opp_row, result in zip(sub_batch, results):
                 opp_row.eligibility_score = result["score"]

@@ -1,36 +1,61 @@
 // ────────────────────────────────────────────────────────────────
-// components/OpportunityCard.jsx — Individual opportunity card
-// Shows title, company, platform badge, deadline, stipend,
-// eligibility score bar, rank, Apply + AI Tailor buttons
+// components/OpportunityCard.jsx — Brutalist opportunity card
+// Bold match score, prominent reasoning, hard borders, mono labels.
+// Preserves every data field and action from the original.
 // ────────────────────────────────────────────────────────────────
 
-import { ExternalLink, Clock, DollarSign, Trophy, Trash2, Sparkles } from 'lucide-react'
+import { ExternalLink, Clock, DollarSign, MapPin, Trash2, Sparkles } from 'lucide-react'
 import StatusBadge from './StatusBadge'
 import { deleteOpportunity } from '../api'
 import toast from 'react-hot-toast'
 
-function EligibilityBar({ score }) {
+function MatchScore({ score }) {
   const pct = Math.round((score || 0) * 100)
-  const color =
-    pct >= 70 ? 'bg-green-500' : pct >= 40 ? 'bg-amber-500' : 'bg-red-500'
+  const colorVar = pct >= 70 ? 'var(--accent)' : pct >= 40 ? 'var(--urgent)' : 'var(--muted)'
+  const r = 20
+  const circumference = 2 * Math.PI * r
+  const offset = circumference - (pct / 100) * circumference
 
   return (
-    <div className="mt-3">
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-xs text-slate-500">Match score</span>
-        <span className="text-xs font-semibold text-slate-300">{pct}%</span>
+    <div className="flex items-center gap-3">
+      <div className="relative w-12 h-12 shrink-0">
+        <svg viewBox="0 0 48 48" className="w-full h-full -rotate-90">
+          <circle
+            cx="24"
+            cy="24"
+            r={r}
+            stroke="var(--border-strong)"
+            strokeWidth="5"
+            fill="none"
+          />
+          <circle
+            cx="24"
+            cy="24"
+            r={r}
+            stroke={colorVar}
+            strokeWidth="5"
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            style={{ transition: 'stroke-dashoffset 0.5s ease-out' }}
+          />
+        </svg>
+        <span className="absolute inset-0 flex items-center justify-center font-display font-bold text-[11px] text-ink">
+          {pct}
+        </span>
       </div>
-      <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${color}`}
-          style={{ width: `${pct}%` }}
-        />
+      <div className="min-w-0">
+        <div className="type-mono text-muted">Match Score</div>
+        <div className="font-display font-bold text-[1.75rem] leading-none text-ink">
+          {pct}%
+        </div>
       </div>
     </div>
   )
 }
 
-export default function OpportunityCard({ opp, onDeleted, onTailor }) {
+export default function OpportunityCard({ opp, onDeleted, onTailor, enterDelay }) {
   const deadline = opp.deadline
     ? new Date(opp.deadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
     : null
@@ -49,105 +74,111 @@ export default function OpportunityCard({ opp, onDeleted, onTailor }) {
   }
 
   return (
-    <div className="card flex flex-col gap-2 animate-slide-up group">
-      {/* Header row */}
-      <div className="flex items-start justify-between gap-2">
+    <article
+      className="card flex flex-col gap-4 animate-slide-up group"
+      style={enterDelay ? { animationDelay: enterDelay } : undefined}
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap mb-1.5">
             <StatusBadge type="platform" value={opp.platform} />
             {opp.rank && (
-              <span className="flex items-center gap-1 text-xs text-slate-500">
-                <Trophy size={10} /> #{opp.rank}
+              <span className="badge bg-surface2 text-ink2 border-border">
+                #{opp.rank}
               </span>
             )}
             {opp.is_eligible && (
-              <span className="badge bg-green-500/15 text-green-400 border border-green-500/30">
-                ✓ Eligible
+              <span className="badge bg-success-soft text-success border-success/20">
+                Eligible
               </span>
             )}
           </div>
-          <h3 className="mt-1.5 font-semibold text-slate-100 text-sm leading-snug line-clamp-2">
-            {opp.title}
-          </h3>
+          <h3 className="type-h3 text-ink line-clamp-2">{opp.title}</h3>
           {opp.company && (
-            <p className="text-xs text-slate-500 mt-0.5">{opp.company}</p>
+            <p className="text-sm text-muted mt-0.5">{opp.company}</p>
           )}
         </div>
         <button
           id={`delete-opp-${opp.id}`}
           onClick={handleDelete}
-          className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-500/10 text-slate-600 hover:text-red-400 transition-all"
+          className="shrink-0 p-1.5 rounded-lg text-muted hover:text-danger hover:bg-danger-soft transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+          aria-label="Delete opportunity"
         >
-          <Trash2 size={13} />
+          <Trash2 size={15} />
         </button>
       </div>
 
-      {/* Meta row */}
-      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+      {/* Reasoning — primary product value */}
+      {opp.eligibility_reason && (
+        <p className="text-sm font-medium text-ink2 leading-relaxed line-clamp-2">
+          {opp.eligibility_reason}
+        </p>
+      )}
+
+      {/* Meta */}
+      <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
         {deadline && (
-          <span className={`flex items-center gap-1 ${isUrgent ? 'text-orange-400 font-medium' : ''}`}>
-            <Clock size={11} />
-            {isUrgent ? '🔥 ' : ''}{deadline}
+          <span
+            className={`flex items-center gap-1 ${
+              isUrgent ? 'text-urgent font-semibold' : ''
+            }`}
+          >
+            <Clock size={12} />
+            {isUrgent && <span className="type-mono">DUE SOON</span>}
+            {deadline}
           </span>
         )}
         {opp.stipend && (
           <span className="flex items-center gap-1">
-            <DollarSign size={11} />
+            <DollarSign size={12} />
             {opp.stipend}
           </span>
         )}
         {opp.location && (
-          <span className="truncate max-w-28">{opp.location}</span>
+          <span className="flex items-center gap-1 truncate max-w-[10rem]">
+            <MapPin size={12} />
+            {opp.location}
+          </span>
         )}
       </div>
 
-      {/* Tags */}
-      {opp.tags?.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-1">
-          {opp.tags.slice(0, 4).map((tag, i) => (
-            <span key={i} className="px-2 py-0.5 rounded-md bg-white/5 text-slate-400 text-xs">
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
+      {/* Score + tags */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <MatchScore score={opp.eligibility_score} />
+        {opp.tags?.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 justify-end">
+            {opp.tags.slice(0, 4).map((tag, i) => (
+              <span
+                key={i}
+                className="px-2 py-0.5 rounded-md bg-surface2 text-ink2 text-[11px] font-medium border border-border"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
 
-      {/* Eligibility bar */}
-      <EligibilityBar score={opp.eligibility_score} />
-
-      {/* Reason */}
-      {opp.eligibility_reason && (
-        <p className="text-xs text-slate-500 italic line-clamp-2 mt-0.5">
-          "{opp.eligibility_reason}"
-        </p>
-      )}
-
-      {/* Action buttons */}
+      {/* Actions */}
       <div className="flex gap-2 mt-auto pt-1">
-        {/* AI Tailor */}
         <button
           id={`tailor-opp-${opp.id}`}
           onClick={() => onTailor?.(opp)}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl
-            bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/25 hover:border-brand-500/50
-            text-brand-300 hover:text-brand-200 text-xs font-medium transition-all"
+          className="btn btn-secondary flex-1"
         >
-          <Sparkles size={11} /> Tailor
+          <Sparkles size={13} /> Tailor
         </button>
-
-        {/* Apply */}
         <a
           id={`apply-opp-${opp.id}`}
           href={opp.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-1 btn-primary justify-center text-xs py-2"
+          className="btn btn-primary flex-1"
         >
-          Apply <ExternalLink size={11} />
+          Apply <ExternalLink size={13} />
         </a>
       </div>
-    </div>
+    </article>
   )
 }
-
-

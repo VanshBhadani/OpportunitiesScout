@@ -1,10 +1,10 @@
 // ────────────────────────────────────────────────────────────────
-// components/Navbar.jsx — Top navigation bar
-// Shows logo, nav links, and a quick "Run Agent" trigger button
+// components/Navbar.jsx — Sidebar navigation (desktop) + bottom
+// nav (mobile). Includes Quick Run trigger.
 // ────────────────────────────────────────────────────────────────
 
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Zap, LayoutDashboard, User, Play } from 'lucide-react'
+import { Zap, LayoutDashboard, User, Play, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { runAgent } from '../api'
 import toast from 'react-hot-toast'
@@ -25,7 +25,6 @@ export default function Navbar() {
     setRunning(true)
     try {
       await runAgent()
-      // Navigate to Run Agent page so the user sees live stats
       navigate('/run')
       toast('Agent started! Watching live…', { icon: '⚡' })
     } catch {
@@ -35,48 +34,89 @@ export default function Navbar() {
     }
   }
 
+  const linkBase =
+    'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors'
+
   return (
-    <header className="sticky top-0 z-50 border-b border-white/5" style={{ backgroundColor: 'rgba(15,15,26,0.85)', backdropFilter: 'blur(20px)' }}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center shadow-lg shadow-brand-900/50">
-              <Zap size={16} className="text-white" />
+    <>
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-[260px] z-[10] flex-col bg-dark text-on-dark border-r border-white/10 backdrop-blur-xl">
+        <div className="p-6">
+          <Link to="/" className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-accent flex items-center justify-center shadow-sm">
+              <Zap size={18} className="text-on-accent" />
             </div>
-            <span className="font-bold text-base text-gradient">OpportunityScout</span>
+            <span className="font-display font-bold text-lg tracking-tight text-on-dark">
+              OpportunityScout
+            </span>
           </Link>
+        </div>
 
-          {/* Nav links */}
-          <nav className="hidden sm:flex items-center gap-1">
-            {navLinks.map(({ to, label, icon: Icon }) => (
-              <Link
-                key={to}
-                to={to}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  pathname === to
-                    ? 'bg-brand-600/20 text-brand-400'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-                }`}
-              >
-                <Icon size={14} />
-                {label}
-              </Link>
-            ))}
-          </nav>
+        <nav className="flex-1 px-4 space-y-1">
+          {navLinks.map(({ to, label, icon: Icon }) => (
+            <Link
+              key={to}
+              to={to}
+              className={`${linkBase} ${
+                pathname === to
+                  ? 'bg-accent/10 text-accent'
+                  : 'text-on-dark-muted hover:text-on-dark hover:bg-white/5'
+              }`}
+            >
+              <Icon size={18} />
+              {label}
+            </Link>
+          ))}
+        </nav>
 
-          {/* Quick Run button */}
+        <div className="p-4 border-t border-white/10">
           <button
             id="navbar-quick-run"
             onClick={handleQuickRun}
             disabled={running}
-            className="btn-primary text-xs px-3 py-1.5"
+            className="btn btn-primary w-full"
           >
-            <Zap size={13} className={running ? 'animate-spin' : ''} />
+            {running ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Zap size={14} />
+            )}
             {running ? 'Running…' : 'Quick Run'}
           </button>
         </div>
-      </div>
-    </header>
+      </aside>
+
+      {/* Mobile bottom nav */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 z-[10] bg-white/85 backdrop-blur-xl border-t border-border flex items-center justify-around px-2">
+        {navLinks.map(({ to, label, icon: Icon }) => (
+          <Link
+            key={to}
+            to={to}
+            className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+              pathname === to
+                ? 'text-accent'
+                : 'text-muted hover:text-ink2'
+            }`}
+          >
+            <Icon size={18} />
+            <span>{label}</span>
+          </Link>
+        ))}
+
+        <button
+          id="navbar-quick-run"
+          onClick={handleQuickRun}
+          disabled={running}
+          className="flex flex-col items-center justify-center gap-0.5 px-3 py-1 text-xs font-semibold text-accent disabled:opacity-50"
+        >
+          {running ? (
+            <Loader2 size={18} className="animate-spin" />
+          ) : (
+            <Zap size={18} />
+          )}
+          <span>{running ? 'Running…' : 'Run'}</span>
+        </button>
+      </nav>
+    </>
   )
 }

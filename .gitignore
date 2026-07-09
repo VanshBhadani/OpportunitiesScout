@@ -49,3 +49,7 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# ── OpenCode tooling & generated artifacts ─────────────────────────
+.opencode/
+graphify-out/
