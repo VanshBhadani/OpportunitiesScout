@@ -440,7 +440,13 @@ export default function Profile() {
       if (result.warning) toast('Some fields need manual fill', { icon: '⚠️' })
       else toast.success('Profile auto-filled!')
     } catch (err) {
-      toast.error(err?.response?.data?.detail || 'Failed to parse resume')
+      const isTimeout = err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')
+      const detail    = err?.response?.data?.detail
+      const errMsg    = isTimeout
+        ? 'Resume upload timed out — the server may be waking up, try again in 30s'
+        : detail || err?.message || 'Failed to parse resume'
+      console.error('[handleFile] parse failed:', err?.message, err?.response?.data)
+      toast.error(errMsg, { duration: 6000 })
       setStage('idle')
       lsClearPdf()
     }

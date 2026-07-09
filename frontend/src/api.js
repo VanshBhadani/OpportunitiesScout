@@ -13,7 +13,7 @@ const baseURL = import.meta.env.VITE_API_URL
 
 const api = axios.create({
   baseURL,
-  timeout: 30000,
+  timeout: 120000,   // 120s — covers Render free-tier cold-start (up to ~50s) + AI call
   headers: { 'Content-Type': 'application/json' },
 })
 
@@ -28,8 +28,15 @@ export const parseResume = (file) => {
   form.append('file', file)
   return api.post('/profile/parse-resume', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
-    timeout: 90000,  // GLM reasoning model needs up to ~30s
-  }).then(r => r.data)
+    timeout: 120000,  // 120s: Render cold-start (~50s) + pdfplumber + AI call
+  }).then(r => r.data).catch(err => {
+    // Surface the real error message for debugging
+    const detail = err?.response?.data?.detail
+    const status = err?.response?.status
+    const axiosMsg = err?.message  // e.g. "timeout of 120000ms exceeded"
+    console.error('[parseResume] error', { status, detail, axiosMsg })
+    throw err
+  })
 }
 
 // ── Opportunities ─────────────────────────────────────────────────
