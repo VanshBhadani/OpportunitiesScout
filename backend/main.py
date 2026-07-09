@@ -561,6 +561,48 @@ def get_glm_status():
     return glm_status.status()
 
 
+@app.get("/api/ai/ping", tags=["GLM"])
+async def ai_ping():
+    """
+    Quick smoke-test: calls the active AI provider with a 1-token prompt.
+    Returns { ok, model, provider, latency_ms, error } in ≤ 10s.
+    Use this to verify the AI is reachable before blaming the resume parser.
+    """
+    import time, httpx as _httpx
+    from openai import OpenAI as _OAI
+
+    cfg  = get_config()
+    prov = cfg["provider"]
+    if prov == "custom":
+        key, url, mdl = cfg["custom_api_key"], cfg["custom_base_url"], cfg["custom_model"]
+    elif prov == "glm":
+        key, url, mdl = settings.zhipuai_api_key, settings.zhipuai_base_url, settings.zhipuai_model
+    else:
+        key, url, mdl = settings.nvidia_api_key, settings.nvidia_base_url, settings.nvidia_model
+
+    t0 = time.time()
+    try:
+        client = _OAI(api_key=key, base_url=url,
+                      http_client=_httpx.Client(timeout=15.0))
+        resp = client.chat.completions.create(
+            model=mdl,
+            messages=[{"role": "user", "content": "Reply with the single word: OK"}],
+            max_tokens=5,
+            temperature=0,
+        )
+        latency = int((time.time() - t0) * 1000)
+        text = (resp.choices[0].message.content or "").strip()
+        return {"ok": True, "provider": prov, "model": mdl, "latency_ms": latency, "reply": text}
+    except Exception as exc:
+        latency = int((time.time() - t0) * 1000)
+        logger.error("[ai/ping] failed in %dms: %s", latency, exc)
+        return JSONResponse(
+            status_code=503,
+            content={"ok": False, "provider": prov, "model": mdl,
+                     "latency_ms": latency, "error": str(exc)},
+        )
+
+
 
 @app.delete("/api/opportunities", tags=["Opportunities"])
 def delete_all_opportunities(db: Session = Depends(get_db)):

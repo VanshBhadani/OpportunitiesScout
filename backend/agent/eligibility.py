@@ -42,28 +42,30 @@ SUB_BATCH_SIZE = 10
 
 def _client() -> OpenAI:
     """Return an OpenAI-compatible client for whichever provider is active."""
+    import httpx
     cfg = get_config()
     provider = cfg["provider"]
+    _timeout = httpx.Client(timeout=60.0)  # hard 60s cap — prevents hanging AI calls
     if provider == "custom":
         return OpenAI(
             api_key=cfg["custom_api_key"],
             base_url=cfg["custom_base_url"],
-            max_retries=4,
-            timeout=90.0,
+            max_retries=1,
+            http_client=_timeout,
         )
     if provider == "glm":
         return OpenAI(
             api_key=settings.zhipuai_api_key,
             base_url=settings.zhipuai_base_url,
-            max_retries=4,
-            timeout=90.0,
+            max_retries=1,
+            http_client=_timeout,
         )
     # default: nvidia
     return OpenAI(
         api_key=settings.nvidia_api_key,
         base_url=settings.nvidia_base_url,
-        max_retries=4,
-        timeout=90.0,
+        max_retries=1,
+        http_client=_timeout,
     )
 
 
@@ -184,8 +186,7 @@ def _call_glm_batch(profile_str: str, compact_opps: list[dict]) -> list[dict] | 
                 {"role": "user",   "content": user_msg},
             ],
             temperature=0.1,
-            top_p=0.95,
-            max_tokens=8192,
+            max_tokens=1024,
         )
     finally:
         glm_status.release(call_id)
@@ -331,7 +332,7 @@ def check_eligibility(profile: dict, opportunity: dict) -> dict[str, Any]:
                 {"role": "user",   "content": prompt},
             ],
             temperature=0.1,
-            max_tokens=2048,  # reasoning model needs room for thinking + output
+            max_tokens=256,
         )
         msg = response.choices[0].message
         text = (msg.content or "").strip() or (getattr(msg, "reasoning_content", "") or "").strip()
