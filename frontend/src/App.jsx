@@ -31,7 +31,7 @@ function AppInner() {
       >
         <Navbar />
         <main id="main-content" className="min-h-screen pb-36">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="w-full max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-12 py-8">
             <Routes>
               <Route path="/"        element={<Dashboard />} />
               <Route path="/profile" element={<Profile />}   />
