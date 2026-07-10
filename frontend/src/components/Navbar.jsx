@@ -1,8 +1,8 @@
 // ────────────────────────────────────────────────────────────────
-// components/Navbar.jsx — Floating bottom dock
-// Apple Dynamic Island × macOS Dock × Arc Browser vibes.
-// Features: spring capsule indicator, magnetic magnification,
-// cursor-proximity tilt, scroll-collapse, idle fade.
+// components/Navbar.jsx — Refined floating dock
+// Thin rounded rectangle · Spring capsule indicator
+// Secondary nav items understated · Run Agent subtly primary
+// All interaction animations preserved from v1
 // ────────────────────────────────────────────────────────────────
 
 import { Link, useLocation } from 'react-router-dom'
@@ -13,11 +13,10 @@ const NAV_ITEMS = [
   { to: '/',        label: 'Dashboard', icon: LayoutDashboard, id: 'nav-dashboard' },
   { to: '/profile', label: 'Profile',   icon: User,            id: 'nav-profile'   },
   { to: '/run',     label: 'Run Agent', icon: Zap,             id: 'nav-run',      isHero: true },
-  { to: '/profile#settings', label: 'Settings', icon: Settings, id: 'nav-settings' },
+  { to: '/settings',label: 'Settings',  icon: Settings,        id: 'nav-settings'  },
 ]
 
-// Spring lerp: smooth interpolation with configurable stiffness
-function springLerp(current, target, stiffness = 0.18) {
+function springLerp(current, target, stiffness = 0.22) {
   return current + (target - current) * stiffness
 }
 
@@ -25,38 +24,40 @@ export default function Navbar() {
   const { pathname } = useLocation()
 
   // ── State ─────────────────────────────────────────────────────
-  const [capsuleX, setCapsuleX]         = useState(null)   // capsule slide position
-  const [capsuleW, setCapsuleW]         = useState(0)
-  const [hoverIdx, setHoverIdx]         = useState(null)
-  const [mouseXRel, setMouseXRel]       = useState(null)   // cursor x relative to dock center
-  const [scrolled, setScrolled]         = useState(false)
-  const [idle, setIdle]                 = useState(false)
-  const [tilt, setTilt]                 = useState(0)
-  const [isNear, setIsNear]             = useState(false)
-  const [clickIdx, setClickIdx]         = useState(null)   // for click spring pop
-  const [runPulse, setRunPulse]         = useState(false)
+  const [capsuleX,   setCapsuleX]   = useState(null)
+  const [capsuleW,   setCapsuleW]   = useState(0)
+  const [hoverIdx,   setHoverIdx]   = useState(null)
+  const [mouseXRel,  setMouseXRel]  = useState(null)
+  const [scrolled,   setScrolled]   = useState(false)
+  const [idle,       setIdle]       = useState(false)
+  const [tilt,       setTilt]       = useState(0)
+  const [isNear,     setIsNear]     = useState(false)
+  const [clickIdx,   setClickIdx]   = useState(null)
+  const [runPulse,   setRunPulse]   = useState(false)
 
   // ── Refs ──────────────────────────────────────────────────────
-  const dockRef      = useRef(null)
-  const itemRefs     = useRef([])
-  const idleTimer    = useRef(null)
-  const rafRef       = useRef(null)
-  const capsuleAnim  = useRef({ x: null, w: 0 })
-  const frameActive  = useRef(false)
+  const dockRef     = useRef(null)
+  const itemRefs    = useRef([])
+  const idleTimer   = useRef(null)
+  const rafRef      = useRef(null)
+  const capsuleAnim = useRef({ x: null, w: 0 })
+  const frameActive = useRef(false)
 
-  // ── Active route index ────────────────────────────────────────
+  // ── Active route ──────────────────────────────────────────────
   const activeIdx = NAV_ITEMS.findIndex(item =>
-    item.to === pathname || (item.to !== '/' && pathname.startsWith(item.to.split('#')[0]))
+    item.to === '/'
+      ? pathname === '/'
+      : pathname.startsWith(item.to.split('#')[0])
   )
 
-  // ── Capsule spring animation ───────────────────────────────────
+  // ── Spring capsule (RAF-driven, no CSS transition) ─────────────
   const animateCapsule = useCallback(() => {
     const el = itemRefs.current[activeIdx]
     if (!el || !dockRef.current) return
 
     const dockRect = dockRef.current.getBoundingClientRect()
     const itemRect = el.getBoundingClientRect()
-    const targetX  = itemRect.left - dockRect.left + dockRect.scrollLeft
+    const targetX  = itemRect.left - dockRect.left
     const targetW  = itemRect.width
 
     if (capsuleAnim.current.x === null) {
@@ -69,37 +70,28 @@ export default function Navbar() {
     if (!frameActive.current) {
       frameActive.current = true
       const tick = () => {
-        capsuleAnim.current.x = springLerp(capsuleAnim.current.x, targetX, 0.22)
-        capsuleAnim.current.w = springLerp(capsuleAnim.current.w, targetW, 0.22)
+        capsuleAnim.current.x = springLerp(capsuleAnim.current.x, targetX, 0.2)
+        capsuleAnim.current.w = springLerp(capsuleAnim.current.w, targetW, 0.2)
         setCapsuleX(capsuleAnim.current.x)
         setCapsuleW(capsuleAnim.current.w)
-
-        const dxDone = Math.abs(capsuleAnim.current.x - targetX) < 0.5
-        const dwDone = Math.abs(capsuleAnim.current.w - targetW) < 0.5
-        if (dxDone && dwDone) {
-          frameActive.current = false
-        } else {
-          rafRef.current = requestAnimationFrame(tick)
-        }
+        const done =
+          Math.abs(capsuleAnim.current.x - targetX) < 0.4 &&
+          Math.abs(capsuleAnim.current.w - targetW) < 0.4
+        if (done) { frameActive.current = false }
+        else { rafRef.current = requestAnimationFrame(tick) }
       }
       rafRef.current = requestAnimationFrame(tick)
     }
   }, [activeIdx])
 
   useEffect(() => {
-    // Small delay so DOM has rendered
-    const t = setTimeout(animateCapsule, 10)
+    const t = setTimeout(animateCapsule, 12)
     return () => { clearTimeout(t); cancelAnimationFrame(rafRef.current) }
   }, [animateCapsule, pathname])
 
   // ── Scroll collapse ───────────────────────────────────────────
   useEffect(() => {
-    let lastY = window.scrollY
-    const onScroll = () => {
-      const y = window.scrollY
-      setScrolled(y > 60)
-      lastY = y
-    }
+    const onScroll = () => setScrolled(window.scrollY > 60)
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
@@ -114,33 +106,29 @@ export default function Navbar() {
   useEffect(() => {
     resetIdle()
     window.addEventListener('mousemove', resetIdle, { passive: true })
-    window.addEventListener('keydown', resetIdle, { passive: true })
+    window.addEventListener('keydown',   resetIdle, { passive: true })
     return () => {
       clearTimeout(idleTimer.current)
       window.removeEventListener('mousemove', resetIdle)
-      window.removeEventListener('keydown', resetIdle)
+      window.removeEventListener('keydown',   resetIdle)
     }
   }, [resetIdle])
 
-  // ── Cursor proximity (tilt + proximity awareness) ─────────────
+  // ── Cursor proximity: tilt + magnification ─────────────────────
   useEffect(() => {
     const onMove = (e) => {
       if (!dockRef.current) return
-      const rect = dockRef.current.getBoundingClientRect()
+      const rect    = dockRef.current.getBoundingClientRect()
       const centerX = rect.left + rect.width / 2
-      const dockY   = rect.top + rect.height / 2
+      const centerY = rect.top  + rect.height / 2
       const dx = e.clientX - centerX
-      const dy = e.clientY - dockY
+      const dy = e.clientY - centerY
       const dist = Math.sqrt(dx * dx + dy * dy)
+      const NEAR = 140
 
-      const NEAR_THRESHOLD = 160
-      setIsNear(dist < NEAR_THRESHOLD)
-
-      if (dist < NEAR_THRESHOLD) {
-        // Tilt: max ±2deg, falls off with distance
-        const tiltAmt = (dx / (rect.width / 2)) * 2 * Math.max(0, 1 - dist / NEAR_THRESHOLD)
-        setTilt(tiltAmt)
-        // Relative x for magnification math
+      setIsNear(dist < NEAR)
+      if (dist < NEAR) {
+        setTilt((dx / (rect.width / 2)) * 1.5 * Math.max(0, 1 - dist / NEAR))
         setMouseXRel(e.clientX - rect.left)
       } else {
         setTilt(0)
@@ -151,49 +139,49 @@ export default function Navbar() {
     return () => window.removeEventListener('mousemove', onMove)
   }, [])
 
-  // ── Run hero pulse ─────────────────────────────────────────────
+  // ── Run Agent subtle pulse ─────────────────────────────────────
   useEffect(() => {
-    const id = setInterval(() => {
-      setRunPulse(p => !p)
-    }, 2200)
+    const id = setInterval(() => setRunPulse(p => !p), 2500)
     return () => clearInterval(id)
   }, [])
 
-  // ── Magnification math ────────────────────────────────────────
+  // ── Magnification (gentle, max 1.12 for secondary) ────────────
   function getItemScale(idx) {
-    if (NAV_ITEMS[idx].isHero) return hoverIdx === idx ? 1.18 : 1.0
-    if (mouseXRel === null || !dockRef.current) return 1
+    const isHero = NAV_ITEMS[idx].isHero
+    if (mouseXRel === null || !dockRef.current) return isHero ? 1.0 : 1.0
     const el = itemRefs.current[idx]
-    if (!el || !dockRef.current) return 1
-    const dockRect = dockRef.current.getBoundingClientRect()
-    const itemRect = el.getBoundingClientRect()
+    if (!el) return 1
+    const dockRect    = dockRef.current.getBoundingClientRect()
+    const itemRect    = el.getBoundingClientRect()
     const itemCenterX = itemRect.left - dockRect.left + itemRect.width / 2
-    const dist = Math.abs(mouseXRel - itemCenterX)
-    const maxDist = 90
-    const maxScale = 1.22
+    const dist        = Math.abs(mouseXRel - itemCenterX)
+    const maxDist     = 80
+    // Hero gets slightly more scale on hover to feel primary
+    const maxScale    = isHero ? 1.14 : 1.10
     if (dist > maxDist) return 1
     return 1 + (maxScale - 1) * Math.pow(1 - dist / maxDist, 2)
   }
 
   function getItemY(idx) {
-    if (NAV_ITEMS[idx].isHero) return 0
     const scale = getItemScale(idx)
-    return -(scale - 1) * 12  // lift proportional to magnification
+    // Secondary items lift 2-3px, hero slightly less (it has other emphasis)
+    const liftFactor = NAV_ITEMS[idx].isHero ? 8 : 10
+    return -(scale - 1) * liftFactor
   }
 
   function handleItemClick(idx) {
     setClickIdx(idx)
-    setTimeout(() => setClickIdx(null), 300)
+    setTimeout(() => setClickIdx(null), 280)
   }
 
-  // ── Composed dock classes/styles ──────────────────────────────
-  const dockOpacity = idle && !isNear ? 0.55 : 1
-  const dockScale   = scrolled ? 0.93 : 1
-  const dockBlur    = scrolled ? 50 : 36
+  // ── Dock-level styles ─────────────────────────────────────────
+  const dockOpacity = idle && !isNear ? 0.5 : 1
+  const dockScale   = scrolled ? 0.94 : 1
+  const dockBlur    = scrolled ? 48 : 32
 
   return (
     <>
-      {/* Skip-to-content for accessibility */}
+      {/* Accessibility: skip link */}
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-accent focus:text-white focus:rounded-lg focus:text-sm focus:font-semibold"
@@ -201,61 +189,69 @@ export default function Navbar() {
         Skip to content
       </a>
 
-      {/* ── Floating Dock ─────────────────────────────────────── */}
+      {/* ── Dock ─────────────────────────────────────────────────── */}
       <nav
         ref={dockRef}
         aria-label="Main navigation"
         style={{
-          opacity: dockOpacity,
-          transform: `scale(${dockScale}) rotate(${tilt}deg)`,
-          backdropFilter: `blur(${dockBlur}px)`,
+          opacity:          dockOpacity,
+          transform:        `translateX(-50%) scale(${dockScale}) rotate(${tilt}deg)`,
+          backdropFilter:   `blur(${dockBlur}px)`,
           WebkitBackdropFilter: `blur(${dockBlur}px)`,
-          transition: 'opacity 0.6s ease, transform 0.35s cubic-bezier(0.22,1,0.36,1)',
+          transition:       'opacity 0.5s ease, transform 0.35s cubic-bezier(0.22,1,0.36,1)',
           boxShadow: [
-            '0 8px 40px rgba(0,0,0,0.45)',
-            '0 2px 8px rgba(0,0,0,0.3)',
-            '0 0 0 1px rgba(255,255,255,0.08)',
+            '0 4px 24px rgba(0,0,0,0.5)',
+            '0 1px 0 rgba(255,255,255,0.06) inset',
             isNear
-              ? '0 0 60px rgba(59,130,246,0.18), 0 16px 60px rgba(0,0,0,0.5)'
-              : '0 0 30px rgba(59,130,246,0.08), 0 16px 40px rgba(0,0,0,0.4)',
+              ? '0 0 0 1px rgba(255,255,255,0.1), 0 8px 48px rgba(0,0,0,0.55), 0 0 40px rgba(59,130,246,0.10)'
+              : '0 0 0 1px rgba(255,255,255,0.07), 0 8px 32px rgba(0,0,0,0.45)',
           ].join(', '),
+          /* Thin elongated rectangle: br=32px */
+          borderRadius: '32px',
         }}
-        className="dock-nav fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-1 px-3 py-2.5 rounded-full"
+        className="dock-nav fixed bottom-6 left-1/2 z-[100] flex items-center px-2 py-0"
+        style2={{ height: '62px' }}
       >
-        {/* Ambient glow underneath */}
+        {/* Ambient glow projected below the dock */}
         <div
-          className="dock-glow pointer-events-none absolute inset-0 rounded-full"
+          aria-hidden="true"
+          className="pointer-events-none absolute -bottom-3 left-1/2 -translate-x-1/2"
           style={{
-            background: 'radial-gradient(ellipse 80% 40% at 50% 110%, rgba(59,130,246,0.22), transparent)',
-            filter: 'blur(4px)',
+            width: '60%',
+            height: '20px',
+            background: 'radial-gradient(ellipse, rgba(59,130,246,0.18) 0%, transparent 70%)',
+            filter: 'blur(8px)',
+            transition: 'opacity 0.4s ease',
+            opacity: isNear ? 1 : 0.5,
           }}
         />
 
-        {/* Spring capsule active indicator */}
+        {/* Spring-driven active capsule */}
         {capsuleX !== null && (
           <div
+            aria-hidden="true"
             className="pointer-events-none absolute"
             style={{
-              left: capsuleX,
-              width: capsuleW,
-              top: 4,
-              bottom: 4,
-              borderRadius: 9999,
-              background: 'linear-gradient(135deg, rgba(59,130,246,0.25) 0%, rgba(99,102,241,0.18) 100%)',
-              boxShadow: '0 0 16px rgba(59,130,246,0.35), inset 0 1px 0 rgba(255,255,255,0.08)',
-              transition: 'none', // driven by RAF, not CSS
+              left:         capsuleX,
+              width:        capsuleW,
+              top:          8,
+              bottom:       8,
+              borderRadius: '20px',
+              background:   'linear-gradient(135deg, rgba(37,99,235,0.22) 0%, rgba(99,102,241,0.14) 100%)',
+              boxShadow:    '0 0 12px rgba(59,130,246,0.22), inset 0 1px 0 rgba(255,255,255,0.07)',
             }}
           />
         )}
 
         {/* Nav items */}
         {NAV_ITEMS.map((item, idx) => {
-          const Icon    = item.icon
+          const Icon     = item.icon
           const isActive = activeIdx === idx
           const isClick  = clickIdx === idx
+          const isHero   = item.isHero
+          const isHov    = hoverIdx === idx
           const scale    = getItemScale(idx)
           const yOff     = getItemY(idx)
-          const isHero   = item.isHero
 
           return (
             <Link
@@ -270,110 +266,120 @@ export default function Navbar() {
               onMouseLeave={() => setHoverIdx(null)}
               style={{
                 transform: isClick
-                  ? `scale(0.88) translateY(${yOff}px)`
+                  ? `scale(0.90) translateY(${yOff}px)`
                   : `scale(${scale}) translateY(${yOff}px)`,
                 transition: isClick
-                  ? 'transform 0.12s cubic-bezier(0.4,0,1,1)'
-                  : 'transform 0.25s cubic-bezier(0.22,1,0.36,1)',
-                zIndex: isHero ? 2 : 1,
+                  ? 'transform 0.10s cubic-bezier(0.4,0,1,1)'
+                  : 'transform 0.22s cubic-bezier(0.22,1,0.36,1)',
+                zIndex:     isHero ? 2 : 1,
+                /* Hero gets a touch more horizontal padding so it reads as distinct */
+                padding:    isHero ? '0 10px' : '0 6px',
+                height:     '62px',
+                display:    'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position:   'relative',
+                borderRadius: '24px',
+                minWidth:   isHero ? '72px' : '60px',
               }}
-              className={`
-                relative flex flex-col items-center justify-center rounded-full
-                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400
-                ${isHero
-                  ? 'w-16 h-16 mx-2'
-                  : 'w-14 h-14'
-                }
-              `}
+              className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 focus-visible:ring-offset-0"
             >
-              {/* Hero Run Agent: special glow ring + pulse */}
+
+              {/* ── Hero Run Agent background chip ──────────────── */}
               {isHero && (
                 <>
-                  {/* Outer pulsing ring */}
+                  {/* Subtle gradient chip — slightly larger than others, not a full circle */}
                   <div
-                    className="absolute inset-0 rounded-full pointer-events-none"
+                    aria-hidden="true"
                     style={{
-                      background: 'transparent',
-                      boxShadow: runPulse
-                        ? '0 0 0 3px rgba(59,130,246,0.55), 0 0 28px rgba(59,130,246,0.35)'
-                        : '0 0 0 2px rgba(59,130,246,0.28), 0 0 14px rgba(59,130,246,0.15)',
-                      transition: 'box-shadow 1.1s ease-in-out',
-                      borderRadius: 9999,
+                      position:     'absolute',
+                      inset:        '10px 4px',
+                      borderRadius: '16px',
+                      background:   'linear-gradient(145deg, rgba(29,78,216,0.55) 0%, rgba(59,130,246,0.40) 50%, rgba(99,102,241,0.35) 100%)',
+                      boxShadow:    isHov
+                        ? '0 0 20px rgba(59,130,246,0.40), 0 0 40px rgba(59,130,246,0.15), inset 0 1px 0 rgba(255,255,255,0.12)'
+                        : runPulse
+                          ? '0 0 12px rgba(59,130,246,0.28), 0 0 24px rgba(59,130,246,0.10), inset 0 1px 0 rgba(255,255,255,0.08)'
+                          : '0 0 8px rgba(59,130,246,0.18), inset 0 1px 0 rgba(255,255,255,0.06)',
+                      transition:   'box-shadow 0.6s ease, background 0.25s ease',
+                      border:       '1px solid rgba(59,130,246,0.30)',
                     }}
                   />
-                  {/* Hero bg disc */}
-                  <div
-                    className="absolute inset-0 rounded-full pointer-events-none"
-                    style={{
-                      background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 50%, #6366f1 100%)',
-                      opacity: hoverIdx === idx ? 1 : 0.9,
-                      boxShadow: hoverIdx === idx
-                        ? '0 0 40px rgba(59,130,246,0.8), 0 0 80px rgba(59,130,246,0.3)'
-                        : '0 0 20px rgba(59,130,246,0.5), 0 0 40px rgba(59,130,246,0.2)',
-                      transition: 'all 0.3s cubic-bezier(0.22,1,0.36,1)',
-                    }}
-                  />
-                  {/* Ripple on click */}
+                  {/* Click ripple */}
                   {isClick && (
                     <div
-                      className="absolute inset-0 rounded-full animate-ping pointer-events-none"
-                      style={{ background: 'rgba(59,130,246,0.4)' }}
+                      aria-hidden="true"
+                      style={{
+                        position:     'absolute',
+                        inset:        '10px 4px',
+                        borderRadius: '16px',
+                        background:   'rgba(59,130,246,0.25)',
+                        animation:    'dock-expand 0.4s cubic-bezier(0.22,1,0.36,1) forwards',
+                      }}
                     />
                   )}
                 </>
               )}
 
-              {/* Regular item hover glow */}
-              {!isHero && hoverIdx === idx && (
+              {/* ── Secondary item hover highlight ──────────────── */}
+              {!isHero && isHov && (
                 <div
-                  className="absolute inset-1 rounded-full pointer-events-none"
+                  aria-hidden="true"
                   style={{
-                    background: 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)',
-                    boxShadow: '0 0 12px rgba(59,130,246,0.2)',
+                    position:   'absolute',
+                    inset:      '12px 4px',
+                    borderRadius: '12px',
+                    background: 'rgba(255,255,255,0.04)',
+                    transition: 'opacity 0.15s ease',
                   }}
                 />
               )}
 
-              {/* Icon */}
+              {/* ── Icon ─────────────────────────────────────────── */}
               <Icon
-                size={isHero ? 22 : 19}
-                strokeWidth={isActive || isHero ? 2.2 : 1.8}
+                size={isHero ? 18 : 17}
+                strokeWidth={isActive ? 2.1 : 1.7}
+                aria-hidden="true"
                 style={{
+                  position:   'relative',
+                  zIndex:     1,
                   color: isHero
-                    ? '#ffffff'
+                    ? 'rgba(219,234,254,0.95)'              /* blue-100 tint */
                     : isActive
-                      ? '#60a5fa'
-                      : hoverIdx === idx
-                        ? '#93c5fd'
-                        : 'rgba(255,255,255,0.55)',
-                  position: 'relative',
-                  zIndex: 1,
-                  filter: (isActive && !isHero)
-                    ? 'drop-shadow(0 0 6px rgba(96,165,250,0.7))'
-                    : isHero
-                      ? 'drop-shadow(0 0 8px rgba(255,255,255,0.6))'
+                      ? 'rgba(147,197,253,0.95)'            /* blue-300 */
+                      : isHov
+                        ? 'rgba(203,213,225,0.85)'          /* slate-300 */
+                        : 'rgba(148,163,184,0.55)',          /* slate-400 dim */
+                  filter: isHero && isHov
+                    ? 'drop-shadow(0 0 5px rgba(147,197,253,0.6))'
+                    : isActive && !isHero
+                      ? 'drop-shadow(0 0 4px rgba(147,197,253,0.45))'
                       : 'none',
-                  transition: 'color 0.2s ease, filter 0.2s ease',
+                  transition: 'color 0.18s ease, filter 0.18s ease',
                 }}
               />
 
-              {/* Label */}
+              {/* ── Label ────────────────────────────────────────── */}
               <span
+                aria-hidden="true"
                 style={{
-                  fontSize: '9px',
-                  fontWeight: 600,
-                  letterSpacing: '0.04em',
-                  fontFamily: 'Inter, system-ui, sans-serif',
-                  position: 'relative',
-                  zIndex: 1,
-                  marginTop: isHero ? 2 : 1,
-                  color: isHero
-                    ? 'rgba(255,255,255,0.85)'
-                    : isActive
-                      ? '#60a5fa'
-                      : 'rgba(255,255,255,0.4)',
-                  transition: 'color 0.2s ease',
+                  position:      'relative',
+                  zIndex:        1,
+                  marginTop:     '3px',
+                  fontSize:      '9.5px',
+                  fontWeight:    isActive ? 600 : 500,
+                  letterSpacing: '0.045em',
+                  fontFamily:    'Inter, system-ui, sans-serif',
                   textTransform: 'uppercase',
+                  color: isHero
+                    ? 'rgba(191,219,254,0.80)'              /* blue-200 soft */
+                    : isActive
+                      ? 'rgba(147,197,253,0.90)'            /* blue-300 */
+                      : isHov
+                        ? 'rgba(203,213,225,0.70)'
+                        : 'rgba(100,116,139,0.60)',          /* slate-500 very dim */
+                  transition: 'color 0.18s ease, font-weight 0.15s ease',
                 }}
               >
                 {item.label}

@@ -284,29 +284,25 @@ body {
 
 .dock-nav {
   background: linear-gradient(
-    135deg,
-    rgba(9, 9, 9, 0.94) 0%,
-    rgba(10, 12, 20, 0.92) 100%
+    145deg,
+    rgba(8, 8, 10, 0.95) 0%,
+    rgba(10, 11, 18, 0.93) 100%
   );
-  border: 1px solid rgba(255, 255, 255, 0.08);
   will-change: transform, opacity;
-  /* Prevent content bleed-through on webkit */
   -webkit-transform: translate(-50%, 0) translateZ(0);
   transform-style: preserve-3d;
+  /* Height enforced via style prop; br=32px for elongated rect */
+  border-radius: 32px;
 }
 
 .dock-glow {
   transition: opacity 0.6s ease;
 }
 
-/* Animate-ping override for the hero ripple */
-@keyframes dock-ping {
-  0%   { transform: scale(1);   opacity: 0.7; }
-  100% { transform: scale(2.2); opacity: 0;   }
-}
-
-.animate-ping {
-  animation: dock-ping 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+/* Run Agent click ripple */
+@keyframes dock-expand {
+  0%   { opacity: 0.6; transform: scale(1); }
+  100% { opacity: 0;   transform: scale(1.5); }
 }
 
 /* Screen-reader only utility */
