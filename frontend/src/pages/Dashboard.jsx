@@ -11,6 +11,7 @@ import FilterBar from '../components/FilterBar'
 import TailorPanel from '../components/TailorPanel'
 import { Inbox, Loader2, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { motion } from 'framer-motion'
 
 const PAGE_SIZE = 20
 
@@ -78,7 +79,7 @@ function RightSidebarWidgets({ opps }) {
   )
 }
 
-export default function Dashboard() {
+export default function Dashboard({ showSplash }) {
   const [opps, setOpps] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -148,8 +149,18 @@ export default function Dashboard() {
     <div className="animate-fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
-        <div>
-          <h1 className="type-h1 text-ink">Opportunity Scout</h1>
+        <div className="relative h-[32px] sm:h-[40px] flex items-center">
+          {showSplash ? (
+            <h1 className="type-h1 text-transparent select-none pointer-events-none drop-shadow-none">Opportunity Scout</h1>
+          ) : (
+            <motion.h1 
+              layoutId="main-logo" 
+              transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+              className="type-h1 text-ink origin-left whitespace-nowrap absolute left-0"
+            >
+              Opportunity Scout
+            </motion.h1>
+          )}
         </div>
         {opps.length > 0 && (
           <button

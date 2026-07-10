@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Globe } from './ui/globe'
+import { motion } from 'framer-motion'
 
 export default function SplashScreen({ onDone }) {
-  // phase: 'enter' → 'hold' → 'rise' → 'exit'
   const [phase, setPhase] = useState('enter')
 
   useEffect(() => {
     const t1 = setTimeout(() => setPhase('hold'),  800)   // logo fades in
     const t2 = setTimeout(() => setPhase('rise'),  2200)  // logo rises
-    const t3 = setTimeout(() => setPhase('exit'),  3000)  // overlay fades out
-    const t4 = setTimeout(() => onDone(),          3500)  // unmount + redirect
+    const t3 = setTimeout(() => onDone(),          3000)  // exit triggered by unmount via AnimatePresence
 
-    return () => [t1, t2, t3, t4].forEach(clearTimeout)
+    return () => [t1, t2, t3].forEach(clearTimeout)
   }, [onDone])
 
   const logoTransform =
@@ -19,13 +18,13 @@ export default function SplashScreen({ onDone }) {
       ? 'translateY(20px) scale(0.95)'
       : phase === 'hold'
       ? 'translateY(0) scale(1)'
-      : 'translateY(-30vh) scale(0.75)'
+      : 'translateY(-10vh) scale(0.95)'
 
   return (
-    <div
-      className={`fixed inset-0 z-[9999] flex items-center justify-center bg-[#0F0F14] transition-opacity duration-500 overflow-hidden ${
-        phase === 'exit' ? 'opacity-0' : 'opacity-100'
-      }`}
+    <motion.div
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.8, ease: 'easeInOut' }}
+      className={`fixed inset-0 z-[9999] flex items-center justify-center bg-[#0F0F14] overflow-hidden`}
     >
       {/* 3D Globe Background */}
       <div 
@@ -46,9 +45,12 @@ export default function SplashScreen({ onDone }) {
           transform: logoTransform,
         }}
       >
-        <span className="pointer-events-none whitespace-pre-wrap bg-gradient-to-b from-white to-slate-400/80 bg-clip-text text-center text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-none text-transparent drop-shadow-2xl">
-          OpportunityScout
-        </span>
+        <motion.span 
+          layoutId="main-logo"
+          className="pointer-events-none whitespace-pre-wrap bg-gradient-to-b from-white to-slate-400/80 bg-clip-text text-center text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-none text-transparent drop-shadow-2xl"
+        >
+          Opportunity Scout
+        </motion.span>
         <p
           className="mt-6 text-sm md:text-base text-slate-300/70 font-medium tracking-wide uppercase transition-opacity duration-300"
           style={{ opacity: phase === 'hold' ? 1 : 0 }}
@@ -84,6 +86,6 @@ export default function SplashScreen({ onDone }) {
           }
         }
       `}</style>
-    </div>
+    </motion.div>
   )
 }

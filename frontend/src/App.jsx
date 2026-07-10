@@ -5,6 +5,7 @@
 
 import { useState, useCallback } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
+import { AnimatePresence } from 'framer-motion'
 import Navbar from './components/Navbar'
 import Dashboard from './pages/Dashboard'
 import Profile from './pages/Profile'
@@ -25,18 +26,16 @@ function AppInner() {
       className="min-h-screen text-ink font-sans bg-cover bg-center bg-no-repeat bg-fixed"
       style={{ backgroundImage: `url('/gradient-21st.png')` }}
     >
-      {showSplash && <SplashScreen onDone={handleSplashDone} />}
+      <AnimatePresence>
+        {showSplash && <SplashScreen onDone={handleSplashDone} key="splash" />}
+      </AnimatePresence>
 
-      <div
-        className={`relative z-[1] transition-opacity duration-300 ease-out ${
-          showSplash ? 'opacity-0 pointer-events-none' : 'opacity-100'
-        }`}
-      >
+      <div className="relative z-[1]">
         <Navbar />
         <main id="main-content" className="min-h-screen pb-36">
           <div className="w-full max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-12 py-8">
             <Routes>
-              <Route path="/"        element={<Dashboard />} />
+              <Route path="/"        element={<Dashboard showSplash={showSplash} />} />
               <Route path="/profile" element={<Profile />}   />
               <Route path="/run"     element={<RunAgent />}  />
             </Routes>
