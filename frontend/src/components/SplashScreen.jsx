@@ -1,20 +1,15 @@
-// ────────────────────────────────────────────────────────────────
-// SplashScreen.jsx — Full-screen intro shown on every hard reload
-// Dark overlay, Space Grotesk wordmark, minimal dot loader.
-// Phases: enter → hold → rise → exit. No orbs, no gradients, no emoji.
-// ────────────────────────────────────────────────────────────────
-
 import { useEffect, useState } from 'react'
+import { Globe } from './ui/globe'
 
 export default function SplashScreen({ onDone }) {
   // phase: 'enter' → 'hold' → 'rise' → 'exit'
   const [phase, setPhase] = useState('enter')
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase('hold'),  600)   // logo fades in
-    const t2 = setTimeout(() => setPhase('rise'),  1600)  // logo rises
-    const t3 = setTimeout(() => setPhase('exit'),  2400)  // overlay fades out
-    const t4 = setTimeout(() => onDone(),          2900)  // unmount + redirect
+    const t1 = setTimeout(() => setPhase('hold'),  800)   // logo fades in
+    const t2 = setTimeout(() => setPhase('rise'),  2200)  // logo rises
+    const t3 = setTimeout(() => setPhase('exit'),  3000)  // overlay fades out
+    const t4 = setTimeout(() => onDone(),          3500)  // unmount + redirect
 
     return () => [t1, t2, t3, t4].forEach(clearTimeout)
   }, [onDone])
@@ -28,33 +23,45 @@ export default function SplashScreen({ onDone }) {
 
   return (
     <div
-      className={`fixed inset-0 z-[9999] flex items-center justify-center bg-dark transition-opacity duration-500 ${
+      className={`fixed inset-0 z-[9999] flex items-center justify-center bg-[#0F0F14] transition-opacity duration-500 overflow-hidden ${
         phase === 'exit' ? 'opacity-0' : 'opacity-100'
       }`}
     >
+      {/* 3D Globe Background */}
+      <div 
+        className="absolute inset-0 flex items-center justify-center z-0 transition-all duration-1000 ease-out"
+        style={{
+          opacity: phase === 'enter' ? 0 : 0.6,
+          transform: phase === 'rise' ? 'translateY(10vh) scale(1.1)' : 'translateY(15vh) scale(1.1)'
+        }}
+      >
+        <Globe />
+        <div className="pointer-events-none absolute inset-0 h-full bg-[radial-gradient(circle_at_50%_150%,rgba(37,99,235,0.15),rgba(15,15,20,1)_70%)]" />
+      </div>
+
       <div
-        className="text-center transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]"
+        className="text-center relative z-10 transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] flex flex-col items-center"
         style={{
           opacity: phase === 'enter' ? 0 : 1,
           transform: logoTransform,
         }}
       >
-        <h1 className="font-display font-bold type-display text-on-dark">
+        <span className="pointer-events-none whitespace-pre-wrap bg-gradient-to-b from-white to-slate-400/80 bg-clip-text text-center text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-none text-transparent drop-shadow-2xl">
           OpportunityScout
-        </h1>
+        </span>
         <p
-          className="mt-2 text-sm text-on-dark-muted transition-opacity duration-300"
+          className="mt-6 text-sm md:text-base text-slate-300/70 font-medium tracking-wide uppercase transition-opacity duration-300"
           style={{ opacity: phase === 'hold' ? 1 : 0 }}
         >
           AI-tailored opportunity discovery
         </p>
 
         {phase === 'hold' && (
-          <div className="mt-8 flex justify-center gap-2">
+          <div className="mt-12 flex justify-center gap-2">
             {[0, 1, 2].map((i) => (
               <span
                 key={i}
-                className="w-2 h-2 rounded-full bg-accent"
+                className="w-2 h-2 rounded-full bg-blue-500/80"
                 style={{
                   animation: 'splashDot 1.2s ease-in-out infinite',
                   animationDelay: `${i * 0.15}s`,
@@ -67,7 +74,7 @@ export default function SplashScreen({ onDone }) {
 
       <style>{`
         @keyframes splashDot {
-          0%, 80%, 100% { opacity: 0.4; transform: scale(0.6); }
+          0%, 80%, 100% { opacity: 0.2; transform: scale(0.6); }
           40%            { opacity: 1;   transform: scale(1); }
         }
         @media (prefers-reduced-motion: reduce) {
