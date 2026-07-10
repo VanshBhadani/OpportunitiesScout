@@ -66,6 +66,10 @@ export const getAgentLogs = () => api.get('/agent/logs').then(r => r.data)
 export const getAgentProgress = (runId) =>
   api.get(`/agent/progress/${runId}`, { timeout: 5000 }).then(r => r.data)
 
+export const deleteRunLog = (runId) =>
+  api.delete(`/agent/logs/${runId}`)
+
+
 
 // ── Email ─────────────────────────────────────────────────────────
 

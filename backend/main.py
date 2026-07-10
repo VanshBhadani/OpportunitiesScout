@@ -718,6 +718,18 @@ def agent_progress(run_id: int):
     return {"run_id": run_id, "logs": run_progress.get_logs(run_id)}
 
 
+@app.delete("/api/agent/logs/{run_id}", status_code=204, tags=["Agent"])
+def delete_run_log(run_id: int, db: Session = Depends(get_db)):
+    """Permanently delete a run log entry by its ID."""
+    log = db.query(RunLog).filter(RunLog.id == run_id).first()
+    if not log:
+        raise HTTPException(status_code=404, detail="Run log not found")
+    if log.status == "running":
+        raise HTTPException(status_code=409, detail="Cannot delete a currently running log")
+    db.delete(log)
+    db.commit()
+
+
 
 # ═══════════════════════════════════════════════════════════════════
 # Email routes

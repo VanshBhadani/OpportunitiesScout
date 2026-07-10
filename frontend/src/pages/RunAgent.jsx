@@ -8,12 +8,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   runAgent, getAgentStatus, getAgentLogs, sendDigest,
-  getAiProvider, setAiProvider, getAgentProgress,
+  getAiProvider, setAiProvider, getAgentProgress, deleteRunLog,
 } from '../api'
 import StatusBadge from '../components/StatusBadge'
 import {
   Zap, RefreshCw, Mail, Clock, CheckCircle, XCircle,
-  Loader2, Search, Cpu, Terminal, SlidersHorizontal, Infinity,
+  Loader2, Search, Cpu, Terminal, SlidersHorizontal, Infinity, Trash2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -274,6 +274,19 @@ export default function RunAgent() {
       toast.error('Refresh failed')
     } finally {
       setRefreshing(false)
+    }
+  }
+
+  async function handleDeleteLog(logId) {
+    if (!window.confirm(`Delete run #${logId} from history? This cannot be undone.`)) return
+    try {
+      await deleteRunLog(logId)
+      setLogs((prev) => prev.filter((l) => l.id !== logId))
+      if (currentRun?.id === logId) setCurrentRun(null)
+      toast.success(`Run #${logId} deleted`)
+    } catch (err) {
+      const detail = err?.response?.data?.detail || 'Delete failed'
+      toast.error(detail)
     }
   }
 
@@ -570,6 +583,7 @@ export default function RunAgent() {
                   <th className="pb-2 text-left font-semibold">Duration</th>
                   <th className="pb-2 text-right font-semibold">Found</th>
                   <th className="pb-2 text-right font-semibold">Eligible</th>
+                  <th className="pb-2 w-8" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -593,6 +607,18 @@ export default function RunAgent() {
                     </td>
                     <td className="py-2.5 text-right text-ink font-semibold">{log.opportunities_found}</td>
                     <td className="py-2.5 text-right text-success font-semibold">{log.opportunities_eligible}</td>
+                    <td className="py-2.5 text-right">
+                      {log.status !== 'running' && (
+                        <button
+                          id={`delete-log-${log.id}`}
+                          onClick={() => handleDeleteLog(log.id)}
+                          title={`Delete run #${log.id}`}
+                          className="p-1 rounded-lg text-muted hover:text-danger hover:bg-danger-soft transition-colors"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
