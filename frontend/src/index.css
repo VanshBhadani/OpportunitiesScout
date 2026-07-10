@@ -279,3 +279,57 @@ body {
   .btn,
   .input { transition: none; }
 }
+
+/* ── Floating Dock ────────────────────────────────────────────── */
+
+.dock-nav {
+  background: linear-gradient(
+    135deg,
+    rgba(9, 9, 9, 0.94) 0%,
+    rgba(10, 12, 20, 0.92) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  will-change: transform, opacity;
+  /* Prevent content bleed-through on webkit */
+  -webkit-transform: translate(-50%, 0) translateZ(0);
+  transform-style: preserve-3d;
+}
+
+.dock-glow {
+  transition: opacity 0.6s ease;
+}
+
+/* Animate-ping override for the hero ripple */
+@keyframes dock-ping {
+  0%   { transform: scale(1);   opacity: 0.7; }
+  100% { transform: scale(2.2); opacity: 0;   }
+}
+
+.animate-ping {
+  animation: dock-ping 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Screen-reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.focus\:not-sr-only:focus {
+  position: fixed;
+  width: auto;
+  height: auto;
+  padding: 0.5rem 1rem;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+

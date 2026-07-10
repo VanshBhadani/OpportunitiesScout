@@ -30,7 +30,7 @@ function AppInner() {
         }`}
       >
         <Navbar />
-        <main className="md:pl-[260px] pb-20 md:pb-0 min-h-screen">
+        <main id="main-content" className="min-h-screen pb-36">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <Routes>
               <Route path="/"        element={<Dashboard />} />
@@ -43,6 +43,7 @@ function AppInner() {
 
     </div>
   )
+
 }
 
 export default function App() {
