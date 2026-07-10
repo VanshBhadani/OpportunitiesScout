@@ -28,7 +28,7 @@ from backend.db.database import get_db, init_db
 from backend.db.models import Profile, Opportunity, RunLog
 from backend.agent.runner import run_pipeline
 from backend.email.digest import send_digest
-from backend.scheduler import start_scheduler, stop_scheduler
+from backend.scheduler import start_scheduler, stop_scheduler, load_config as _sched_load, apply_config as _sched_apply
 from backend import glm_status
 from backend.ai_provider import get_provider, get_config, set_provider as _set_provider
 from backend import progress as run_progress
@@ -784,8 +784,34 @@ def set_active_provider(body: dict):
         raise HTTPException(status_code=400, detail=str(exc))
 
 
+# ═══════════════════════════════════════════════════════════════════
+# Scheduler config routes
+# ═══════════════════════════════════════════════════════════════════
 
-# ── Dev entry point ────────────────────────────────────────────────
+@app.get("/api/scheduler/config", tags=["Config"])
+def get_scheduler_config():
+    """Return current scheduler config: { enabled, hour, minute }."""
+    return _sched_load()
+
+
+@app.post("/api/scheduler/config", tags=["Config"])
+def set_scheduler_config(body: dict):
+    """
+    Update scheduler config and live-reschedule.
+    Body: { enabled: bool, hour: 0-23, minute: 0-59 }
+    """
+    enabled = bool(body.get("enabled", True))
+    hour    = int(body.get("hour", 8))
+    minute  = int(body.get("minute", 0))
+    if not (0 <= hour <= 23):
+        raise HTTPException(status_code=400, detail="hour must be 0-23")
+    if not (0 <= minute <= 59):
+        raise HTTPException(status_code=400, detail="minute must be 0-59")
+    result = _sched_apply(enabled=enabled, hour=hour, minute=minute)
+    logger.info("Scheduler config updated: %s", result)
+    return result
+
+
 
 if __name__ == "__main__":
     import uvicorn

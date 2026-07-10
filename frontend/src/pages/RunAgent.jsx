@@ -9,11 +9,13 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   runAgent, getAgentStatus, getAgentLogs, sendDigest,
   getAiProvider, setAiProvider, getAgentProgress, deleteRunLog,
+  getSchedulerConfig, setSchedulerConfig,
 } from '../api'
 import StatusBadge from '../components/StatusBadge'
 import {
   Zap, RefreshCw, Mail, Clock, CheckCircle, XCircle,
   Loader2, Search, Cpu, Terminal, SlidersHorizontal, Infinity, Trash2,
+  CalendarClock, Power,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -79,6 +81,14 @@ export default function RunAgent() {
   const [maxProcess, setMaxProcess] = useState(50)
   const [processAll, setProcessAll] = useState(false)
 
+  // ── Scheduler state ───────────────────────────────────────────
+  const [schedEnabled, setSchedEnabled]   = useState(true)
+  const [schedHour,    setSchedHour]      = useState(8)
+  const [schedMinute,  setSchedMinute]    = useState(0)
+  const [schedAmPm,    setSchedAmPm]      = useState('AM')
+  const [schedSaving,  setSchedSaving]    = useState(false)
+  const [schedSaved,   setSchedSaved]     = useState(false)
+
   const [customApiKey, setCustomApiKey]     = useState('')
   const [customBaseUrl, setCustomBaseUrl]   = useState('https://integrate.api.nvidia.com/v1')
   const [customModel, setCustomModel]       = useState('')
@@ -121,6 +131,17 @@ export default function RunAgent() {
         const p = await getAiProvider()
         setProvider(p.provider)
         setShowCustomFields(p.provider === 'custom')
+      } catch { /* ignore */ }
+      try {
+        const s = await getSchedulerConfig()
+        // Convert 24h → 12h for display
+        const h24 = s.hour ?? 8
+        const ampm = h24 >= 12 ? 'PM' : 'AM'
+        const h12  = h24 % 12 === 0 ? 12 : h24 % 12
+        setSchedEnabled(s.enabled ?? true)
+        setSchedHour(h12)
+        setSchedMinute(s.minute ?? 0)
+        setSchedAmPm(ampm)
       } catch { /* ignore */ }
     }
     init()
@@ -256,6 +277,27 @@ export default function RunAgent() {
       toast.error(`SMTP Error: ${detail}`)
     } finally {
       setSendingDigest(false)
+    }
+  }
+
+  async function handleSaveSchedule() {
+    setSchedSaving(true)
+    try {
+      // Convert 12h → 24h
+      let h24 = schedHour % 12
+      if (schedAmPm === 'PM') h24 += 12
+      await setSchedulerConfig({ enabled: schedEnabled, hour: h24, minute: schedMinute })
+      setSchedSaved(true)
+      setTimeout(() => setSchedSaved(false), 2500)
+      toast.success(
+        schedEnabled
+          ? `Scheduler set to ${String(schedHour).padStart(2,'0')}:${String(schedMinute).padStart(2,'0')} ${schedAmPm} IST daily`
+          : 'Scheduler disabled'
+      )
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Failed to save schedule')
+    } finally {
+      setSchedSaving(false)
     }
   }
 
@@ -553,6 +595,114 @@ export default function RunAgent() {
             )}
           </div>
         )}
+      </div>
+
+      {/* ── Scheduler card ── */}
+      <div className="card mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-accent/10 flex items-center justify-center border border-accent/20">
+              <CalendarClock size={15} className="text-accent" />
+            </div>
+            <div>
+              <h2 className="type-h3 text-ink">Auto-Scheduler</h2>
+              <p className="text-xs text-muted mt-0.5">Runs pipeline + sends digest email daily at your chosen time (IST)</p>
+            </div>
+          </div>
+          {/* Enable / Disable toggle */}
+          <button
+            id="scheduler-toggle"
+            onClick={() => setSchedEnabled(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+              schedEnabled
+                ? 'bg-success/10 border-success/30 text-success hover:bg-success/20'
+                : 'bg-surface2 border-border-strong text-muted hover:text-ink'
+            }`}
+          >
+            <Power size={12} />
+            {schedEnabled ? 'Enabled' : 'Disabled'}
+          </button>
+        </div>
+
+        <div className={`transition-opacity ${schedEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            {/* Hour */}
+            <div>
+              <label className="text-xs text-muted block mb-1">Hour</label>
+              <select
+                id="sched-hour"
+                value={schedHour}
+                onChange={e => setSchedHour(Number(e.target.value))}
+                className="bg-surface2 border border-border-strong rounded-lg px-3 py-1.5 text-sm text-ink focus:outline-none focus:border-accent"
+              >
+                {Array.from({length: 12}, (_, i) => i + 1).map(h => (
+                  <option key={h} value={h}>{String(h).padStart(2,'0')}</option>
+                ))}
+              </select>
+            </div>
+            {/* Minute */}
+            <div>
+              <label className="text-xs text-muted block mb-1">Minute</label>
+              <select
+                id="sched-minute"
+                value={schedMinute}
+                onChange={e => setSchedMinute(Number(e.target.value))}
+                className="bg-surface2 border border-border-strong rounded-lg px-3 py-1.5 text-sm text-ink focus:outline-none focus:border-accent"
+              >
+                {[0,5,10,15,20,25,30,35,40,45,50,55].map(m => (
+                  <option key={m} value={m}>{String(m).padStart(2,'0')}</option>
+                ))}
+              </select>
+            </div>
+            {/* AM / PM */}
+            <div>
+              <label className="text-xs text-muted block mb-1">AM / PM</label>
+              <div className="flex rounded-xl overflow-hidden border border-border-strong">
+                {['AM','PM'].map(ap => (
+                  <button
+                    key={ap}
+                    id={`sched-${ap.toLowerCase()}`}
+                    onClick={() => setSchedAmPm(ap)}
+                    className={`px-4 py-1.5 text-xs font-semibold transition-colors ${
+                      schedAmPm === ap
+                        ? 'bg-accent text-on-accent'
+                        : 'text-muted hover:text-ink hover:bg-surface2/50'
+                    }`}
+                  >{ap}</button>
+                ))}
+              </div>
+            </div>
+            {/* Preview */}
+            <div className="flex-1 min-w-[160px]">
+              <label className="text-xs text-muted block mb-1">Next run</label>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface2 border border-border text-xs text-ink2 font-mono">
+                <Clock size={11} className="text-accent" />
+                Every day at {String(schedHour).padStart(2,'0')}:{String(schedMinute).padStart(2,'0')} {schedAmPm} IST
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button
+          id="save-schedule-btn"
+          onClick={handleSaveSchedule}
+          disabled={schedSaving}
+          className={`btn w-full transition-all ${
+            schedSaved ? 'btn-secondary text-success' : 'btn-primary'
+          }`}
+        >
+          {schedSaving ? (
+            <><Loader2 size={13} className="animate-spin" /> Saving…</>
+          ) : schedSaved ? (
+            <><CheckCircle size={13} /> Saved!</>
+          ) : (
+            <><CalendarClock size={13} /> {schedEnabled ? 'Save Schedule' : 'Disable Scheduler'}</>
+          )}
+        </button>
+
+        <p className="text-xs text-muted mt-3 text-center">
+          ⚠️ Render free tier sleeps after 15 min inactivity. Open the app before the scheduled time to wake the server.
+        </p>
       </div>
 
       {/* History */}

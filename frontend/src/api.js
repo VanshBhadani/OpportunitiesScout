@@ -88,5 +88,13 @@ export const getAiProvider = () =>
 export const setAiProvider = (config) =>
   api.post('/config/provider', config).then(r => r.data)
 
+// ── Scheduler ─────────────────────────────────────────────────────
+
+export const getSchedulerConfig = () =>
+  api.get('/scheduler/config').then(r => r.data)
+
+export const setSchedulerConfig = (config) =>
+  api.post('/scheduler/config', config).then(r => r.data)
+
 
 export default api
