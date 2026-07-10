@@ -13,7 +13,6 @@ export default function FilterBar({ filters, onChange }) {
   return (
     <div className="sticky top-8 flex flex-col gap-6">
       <div>
-        <div className="type-mono mb-3">// FILTERS</div>
         <div className="flex flex-col gap-4">
           {/* Search */}
           <div className="relative">

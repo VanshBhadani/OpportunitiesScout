@@ -149,10 +149,7 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
         <div>
-          <h1 className="type-h1 text-ink">Opportunities</h1>
-          <p className="text-sm text-muted mt-1">
-            AI-matched internships, competitions &amp; hackathons — ranked for you.
-          </p>
+          <h1 className="type-h1 text-ink">Opportunity Scout</h1>
         </div>
         {opps.length > 0 && (
           <button
