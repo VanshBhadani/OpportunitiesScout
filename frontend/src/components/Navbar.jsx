@@ -6,14 +6,13 @@
 // ────────────────────────────────────────────────────────────────
 
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, User, Zap, Settings } from 'lucide-react'
+import { LayoutDashboard, User, Zap } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 
 const NAV_ITEMS = [
   { to: '/',        label: 'Dashboard', icon: LayoutDashboard, id: 'nav-dashboard' },
   { to: '/profile', label: 'Profile',   icon: User,            id: 'nav-profile'   },
-  { to: '/run',     label: 'Run Agent', icon: Zap,             id: 'nav-run',      isHero: true },
-  { to: '/settings',label: 'Settings',  icon: Settings,        id: 'nav-settings'  },
+  { to: '/run',     label: 'Run Agent', icon: Zap,             id: 'nav-run'        },
 ]
 
 function springLerp(current, target, stiffness = 0.22) {
@@ -33,7 +32,6 @@ export default function Navbar() {
   const [tilt,       setTilt]       = useState(0)
   const [isNear,     setIsNear]     = useState(false)
   const [clickIdx,   setClickIdx]   = useState(null)
-  const [runPulse,   setRunPulse]   = useState(false)
 
   // ── Refs ──────────────────────────────────────────────────────
   const dockRef     = useRef(null)
@@ -139,16 +137,9 @@ export default function Navbar() {
     return () => window.removeEventListener('mousemove', onMove)
   }, [])
 
-  // ── Run Agent subtle pulse ─────────────────────────────────────
-  useEffect(() => {
-    const id = setInterval(() => setRunPulse(p => !p), 2500)
-    return () => clearInterval(id)
-  }, [])
-
-  // ── Magnification (gentle, max 1.12 for secondary) ────────────
+  // ── Magnification (uniform across all items) ─────────────────
   function getItemScale(idx) {
-    const isHero = NAV_ITEMS[idx].isHero
-    if (mouseXRel === null || !dockRef.current) return isHero ? 1.0 : 1.0
+    if (mouseXRel === null || !dockRef.current) return 1
     const el = itemRefs.current[idx]
     if (!el) return 1
     const dockRect    = dockRef.current.getBoundingClientRect()
@@ -156,17 +147,13 @@ export default function Navbar() {
     const itemCenterX = itemRect.left - dockRect.left + itemRect.width / 2
     const dist        = Math.abs(mouseXRel - itemCenterX)
     const maxDist     = 80
-    // Hero gets slightly more scale on hover to feel primary
-    const maxScale    = isHero ? 1.14 : 1.10
+    const maxScale    = 1.11
     if (dist > maxDist) return 1
     return 1 + (maxScale - 1) * Math.pow(1 - dist / maxDist, 2)
   }
 
   function getItemY(idx) {
-    const scale = getItemScale(idx)
-    // Secondary items lift 2-3px, hero slightly less (it has other emphasis)
-    const liftFactor = NAV_ITEMS[idx].isHero ? 8 : 10
-    return -(scale - 1) * liftFactor
+    return -(getItemScale(idx) - 1) * 10
   }
 
   function handleItemClick(idx) {
@@ -248,7 +235,6 @@ export default function Navbar() {
           const Icon     = item.icon
           const isActive = activeIdx === idx
           const isClick  = clickIdx === idx
-          const isHero   = item.isHero
           const isHov    = hoverIdx === idx
           const scale    = getItemScale(idx)
           const yOff     = getItemY(idx)
@@ -286,76 +272,50 @@ export default function Navbar() {
               className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 focus-visible:ring-offset-0"
             >
 
-              {/* ── Hero Run Agent background chip ──────────────── */}
-              {isHero && (
-                <>
-                  {/* Subtle gradient chip — slightly larger than others, not a full circle */}
-                  <div
-                    aria-hidden="true"
-                    style={{
-                      position:     'absolute',
-                      inset:        '10px 4px',
-                      borderRadius: '16px',
-                      background:   'linear-gradient(145deg, rgba(29,78,216,0.55) 0%, rgba(59,130,246,0.40) 50%, rgba(99,102,241,0.35) 100%)',
-                      boxShadow:    isHov
-                        ? '0 0 20px rgba(59,130,246,0.40), 0 0 40px rgba(59,130,246,0.15), inset 0 1px 0 rgba(255,255,255,0.12)'
-                        : runPulse
-                          ? '0 0 12px rgba(59,130,246,0.28), 0 0 24px rgba(59,130,246,0.10), inset 0 1px 0 rgba(255,255,255,0.08)'
-                          : '0 0 8px rgba(59,130,246,0.18), inset 0 1px 0 rgba(255,255,255,0.06)',
-                      transition:   'box-shadow 0.6s ease, background 0.25s ease',
-                      border:       '1px solid rgba(59,130,246,0.30)',
-                    }}
-                  />
-                  {/* Click ripple */}
-                  {isClick && (
-                    <div
-                      aria-hidden="true"
-                      style={{
-                        position:     'absolute',
-                        inset:        '10px 4px',
-                        borderRadius: '16px',
-                        background:   'rgba(59,130,246,0.25)',
-                        animation:    'dock-expand 0.4s cubic-bezier(0.22,1,0.36,1) forwards',
-                      }}
-                    />
-                  )}
-                </>
-              )}
-
-              {/* ── Secondary item hover highlight ──────────────── */}
-              {!isHero && isHov && (
+              {/* ── Hover highlight (all items uniform) ──────── */}
+              {isHov && !isActive && (
                 <div
                   aria-hidden="true"
                   style={{
-                    position:   'absolute',
-                    inset:      '12px 4px',
+                    position:     'absolute',
+                    inset:        '12px 4px',
                     borderRadius: '12px',
-                    background: 'rgba(255,255,255,0.04)',
-                    transition: 'opacity 0.15s ease',
+                    background:   'rgba(255,255,255,0.04)',
+                    transition:   'opacity 0.15s ease',
+                  }}
+                />
+              )}
+
+              {/* Click ripple (all items) */}
+              {isClick && (
+                <div
+                  aria-hidden="true"
+                  style={{
+                    position:     'absolute',
+                    inset:        '12px 4px',
+                    borderRadius: '12px',
+                    background:   'rgba(59,130,246,0.18)',
+                    animation:    'dock-expand 0.4s cubic-bezier(0.22,1,0.36,1) forwards',
                   }}
                 />
               )}
 
               {/* ── Icon ─────────────────────────────────────────── */}
               <Icon
-                size={isHero ? 18 : 17}
+                size={17}
                 strokeWidth={isActive ? 2.1 : 1.7}
                 aria-hidden="true"
                 style={{
                   position:   'relative',
                   zIndex:     1,
-                  color: isHero
-                    ? 'rgba(219,234,254,0.95)'              /* blue-100 tint */
-                    : isActive
-                      ? 'rgba(147,197,253,0.95)'            /* blue-300 */
-                      : isHov
-                        ? 'rgba(203,213,225,0.85)'          /* slate-300 */
-                        : 'rgba(148,163,184,0.55)',          /* slate-400 dim */
-                  filter: isHero && isHov
-                    ? 'drop-shadow(0 0 5px rgba(147,197,253,0.6))'
-                    : isActive && !isHero
-                      ? 'drop-shadow(0 0 4px rgba(147,197,253,0.45))'
-                      : 'none',
+                  color: isActive
+                    ? 'rgba(147,197,253,0.95)'    /* blue-300 — active page only */
+                    : isHov
+                      ? 'rgba(203,213,225,0.85)'  /* slate-300 on hover */
+                      : 'rgba(148,163,184,0.50)',  /* slate-400 dim idle */
+                  filter: isActive
+                    ? 'drop-shadow(0 0 4px rgba(147,197,253,0.45))'
+                    : 'none',
                   transition: 'color 0.18s ease, filter 0.18s ease',
                 }}
               />
@@ -372,13 +332,11 @@ export default function Navbar() {
                   letterSpacing: '0.045em',
                   fontFamily:    'Inter, system-ui, sans-serif',
                   textTransform: 'uppercase',
-                  color: isHero
-                    ? 'rgba(191,219,254,0.80)'              /* blue-200 soft */
-                    : isActive
-                      ? 'rgba(147,197,253,0.90)'            /* blue-300 */
-                      : isHov
-                        ? 'rgba(203,213,225,0.70)'
-                        : 'rgba(100,116,139,0.60)',          /* slate-500 very dim */
+                  color: isActive
+                    ? 'rgba(147,197,253,0.90)'    /* blue-300 — active page only */
+                    : isHov
+                      ? 'rgba(203,213,225,0.70)'
+                      : 'rgba(100,116,139,0.55)',  /* dim idle */
                   transition: 'color 0.18s ease, font-weight 0.15s ease',
                 }}
               >
