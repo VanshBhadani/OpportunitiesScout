@@ -23,7 +23,8 @@ export default function FilterBar({ filters, onChange }) {
               placeholder="Search..."
               value={filters.search || ''}
               onChange={(e) => set('search', e.target.value)}
-              className="input pl-9 w-full"
+              className="input w-full"
+              style={{ paddingLeft: '2.25rem' }}
             />
           </div>
 
