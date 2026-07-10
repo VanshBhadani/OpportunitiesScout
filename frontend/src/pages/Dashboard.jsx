@@ -151,12 +151,18 @@ export default function Dashboard({ showSplash }) {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
         <div className="relative h-[32px] sm:h-[40px] flex items-center">
           {showSplash ? (
-            <h1 className="type-h1 text-transparent select-none pointer-events-none drop-shadow-none">Opportunity Scout</h1>
+            <h1 
+              className="type-h1 text-transparent select-none pointer-events-none drop-shadow-none"
+              style={{ whiteSpace: 'nowrap', textWrap: 'nowrap' }}
+            >
+              Opportunity Scout
+            </h1>
           ) : (
             <motion.h1 
               layoutId="main-logo" 
               transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-              className="type-h1 text-ink origin-left whitespace-nowrap absolute left-0"
+              className="type-h1 text-ink origin-left absolute left-0"
+              style={{ whiteSpace: 'nowrap', textWrap: 'nowrap' }}
             >
               Opportunity Scout
             </motion.h1>

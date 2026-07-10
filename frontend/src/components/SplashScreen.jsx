@@ -48,6 +48,7 @@ export default function SplashScreen({ onDone }) {
         <motion.span 
           layoutId="main-logo"
           className="pointer-events-none whitespace-pre-wrap bg-gradient-to-b from-white to-slate-400/80 bg-clip-text text-center text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight leading-none text-transparent drop-shadow-2xl"
+          style={{ whiteSpace: 'nowrap', textWrap: 'nowrap' }}
         >
           Opportunity Scout
         </motion.span>
