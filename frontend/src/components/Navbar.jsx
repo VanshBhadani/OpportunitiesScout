@@ -66,7 +66,7 @@ export default function Navbar() {
                     isActive ? 'px-4' : 'px-0 w-12'
                   } ${
                     isActive 
-                      ? isRunAgent ? 'text-white bg-blue-600' : 'text-ink bg-white/10'
+                      ? 'text-white bg-blue-600'
                       : isRunAgent 
                         ? 'text-blue-400 bg-transparent hover:bg-blue-500/10' 
                         : 'text-muted bg-transparent hover:text-ink2 hover:bg-white/5'
@@ -78,7 +78,7 @@ export default function Navbar() {
                     size={isRunAgent ? 19 : 18} 
                     strokeWidth={isActive || (isRunAgent && isHovered) ? 2.5 : 2}
                     className={`relative z-10 shrink-0 transition-all duration-300 ${
-                      isRunAgent && isActive ? 'drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]' : 
+                      isActive ? 'drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]' : 
                       isRunAgent && isHovered ? 'drop-shadow-[0_0_8px_rgba(59,130,246,0.8)]' : ''
                     }`}
                   />
