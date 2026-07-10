@@ -21,7 +21,10 @@ function AppInner() {
   }, [navigate])
 
   return (
-    <div className="min-h-screen bg-background text-ink font-sans">
+    <div 
+      className="min-h-screen text-ink font-sans bg-cover bg-center bg-no-repeat bg-fixed"
+      style={{ backgroundImage: `url('/gradient-21st.png')` }}
+    >
       {showSplash && <SplashScreen onDone={handleSplashDone} />}
 
       <div
