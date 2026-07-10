@@ -257,9 +257,8 @@ export default function Navbar() {
                 transition: isClick
                   ? 'transform 0.10s cubic-bezier(0.4,0,1,1)'
                   : 'transform 0.22s cubic-bezier(0.22,1,0.36,1)',
-                zIndex:     isHero ? 2 : 1,
-                /* Hero gets a touch more horizontal padding so it reads as distinct */
-                padding:    isHero ? '0 10px' : '0 6px',
+                zIndex:     1,
+                padding:    '0 6px',
                 height:     '62px',
                 display:    'flex',
                 flexDirection: 'column',
@@ -267,7 +266,7 @@ export default function Navbar() {
                 justifyContent: 'center',
                 position:   'relative',
                 borderRadius: '24px',
-                minWidth:   isHero ? '72px' : '60px',
+                minWidth:   '60px',
               }}
               className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 focus-visible:ring-offset-0"
             >
