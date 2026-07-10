@@ -676,8 +676,10 @@ async def trigger_agent(
     async def _run(rid: int, max_process: Optional[int]):
         from backend.db.database import SessionLocal
         db2 = SessionLocal()
+        pipeline_ok = False
         try:
             await run_pipeline(db2, existing_run_id=rid, max_process=max_process)
+            pipeline_ok = True
         except Exception as exc:
             logger.error("Background pipeline error: %s", exc)
             try:
@@ -690,6 +692,13 @@ async def trigger_agent(
             except Exception:
                 pass
         finally:
+            # Auto-send digest email if pipeline completed successfully
+            if pipeline_ok:
+                try:
+                    send_digest(db2)
+                    logger.info("Auto-digest email sent after run #%d", rid)
+                except Exception as mail_exc:
+                    logger.error("Auto-digest failed for run #%d: %s", rid, mail_exc)
             db2.close()
 
     background_tasks.add_task(_run, run_id, config.max_process)
